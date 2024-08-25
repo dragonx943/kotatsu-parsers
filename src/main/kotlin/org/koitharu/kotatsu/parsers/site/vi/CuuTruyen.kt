@@ -12,6 +12,7 @@ import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
 import java.util.*
+import java.text.SimpleDateFormat
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
 internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
@@ -31,6 +32,11 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
 
     private val tagsCache = SuspendLazy(::fetchTags)
 
+	fun String.toDate(): Date {
+    	val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    	return format.parse(this) ?: throw ParseException("Invalid date format", this)
+	}
+
     override suspend fun getListPage(
         page: Int,
         query: String?,
@@ -49,20 +55,21 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         for (i in 0 until total) {
             val jo = json.getJSONObject(i)
             list += Manga(
-                url = "/api/v2/mangas/${jo.getLong("id")}",
-                publicUrl = "https://cuutruyen.net/manga/${jo.getLong("id")}",
-                source = MangaParserSource.CUUTRUYEN,
-                title = jo.getString("name"),
-                coverUrl = jo.getString("cover_url"),
-                largeCoverUrl = jo.getString("cover_mobile_url"),
-                state = null,
-                rating = 0f,
-                id = generateUid(jo.getLong("id")),
-                isNsfw = false,
-                tags = emptySet(),
-                author = null,
-                description = "",
-            )
+    			url = "/api/v2/mangas/${jo.getLong("id")}",
+    			publicUrl = "https://cuutruyen.net/manga/${jo.getLong("id")}",
+    			source = MangaParserSource.CUUTRUYEN,
+    			title = jo.getString("name"),
+    			coverUrl = jo.getString("cover_url"),
+    			largeCoverUrl = jo.getString("cover_mobile_url"),
+    			state = null,
+    			rating = 0f,
+    			id = generateUid(jo.getLong("id")),
+    			isNsfw = true,
+    			tags = emptySet(),
+    			author = null,
+    			description = "",
+    			altTitle = ""
+			)
         }
         return list
     }
