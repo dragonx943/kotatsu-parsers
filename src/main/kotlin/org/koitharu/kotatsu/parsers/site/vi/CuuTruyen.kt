@@ -1,6 +1,5 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
-import androidx.collection.ArrayMap
 import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -8,7 +7,6 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.PagedMangaParser
-import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
@@ -24,7 +22,13 @@ import java.util.zip.Inflater
 internal class CuuTruyen(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
+    override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
 
+    override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
+        super.onCreateConfig(keys)
+        keys.add(userAgentKey)
+    }
+	
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
         SortOrder.POPULARITY,
@@ -32,7 +36,7 @@ internal class CuuTruyen(context: MangaLoaderContext) : PagedMangaParser(context
     )
 
     override fun getRequestHeaders(): Headers = Headers.Builder()
-        .add("User-Agent", UserAgents.KOTATSU)
+        .add("User-Agent", config[userAgentKey])
         .add("Referer", domain)
         .build()
 
@@ -180,7 +184,6 @@ internal class CuuTruyen(context: MangaLoaderContext) : PagedMangaParser(context
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun parseChapterDate(date: String): Long {
         return try {
             SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(date)?.time ?: 0L
