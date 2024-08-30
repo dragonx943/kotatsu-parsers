@@ -38,7 +38,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
 
     override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
 
-    override suspend fun getListPage(
+	private suspend fun getListPage(
         offset: Int,
         query: String?,
         tags: Set<MangaTag>?,
