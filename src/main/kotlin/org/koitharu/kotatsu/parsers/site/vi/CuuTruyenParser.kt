@@ -103,7 +103,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                     number = jo.getInt("number"),
                     url = "/api/v2/chapters/${jo.getLong("id")}",
                     scanlator = jo.optString("group_name"),
-                    uploadDate = parseChapterDate(jo.getString("created_at"))?.time ?: 0L,
+                    uploadDate = parseChapterDate(jo.getString("created_at")),
                     branch = null,
                     source = source,
                 )
