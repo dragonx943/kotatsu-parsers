@@ -18,7 +18,7 @@ import org.koitharu.kotatsu.parsers.util.domain
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
 internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
 
-    override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
+    override val configKeyDomain = ConfigKey.Domain("cuutruyen.net", "nettrom.com", "hetcuutruyen.net", "cuutruyent9sv7.xyz")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
