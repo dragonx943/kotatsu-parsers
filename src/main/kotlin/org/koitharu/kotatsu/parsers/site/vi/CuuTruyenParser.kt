@@ -19,10 +19,10 @@ import java.util.*
 import java.util.zip.Inflater
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
-internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
+internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
-	
+
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
         SortOrder.POPULARITY,
@@ -34,11 +34,12 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         .build()
 
     private val decryptionKey = "3141592653589793"
-	override val itemsPerPage = 20
-	
+
+    override val itemsPerPage = 20  // Define itemsPerPage if not inherited from the parent class
+
     override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
 
-    override suspend fun getListPage(
+    override suspend fun getList(
         offset: Int,
         query: String?,
         tags: Set<MangaTag>?,
@@ -69,7 +70,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
 
         val json = webClient.httpGet(url).parseJson()
         val data = json.optJSONObject("data") ?: throw ParseException("Invalid response", url)
-        
+
         return data.getJSONArray("data").mapJSON { jo ->
             Manga(
                 id = generateUid(jo.getLong("id")),
@@ -94,7 +95,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         val url = domain + manga.url
         val json = webClient.httpGet(url).parseJson().getJSONObject("data")
             ?: throw ParseException("Invalid response", url)
-        
+
         return manga.copy(
             description = json.getString("description"),
             chapters = json.getJSONArray("chapters").mapJSON { jo ->
@@ -116,7 +117,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         val url = "$domain${chapter.url}"
         val json = webClient.httpGet(url).parseJson().getJSONObject("data")
             ?: throw ParseException("Invalid response", url)
-        
+
         return json.getJSONArray("pages").mapJSON { jo ->
             val imageUrl = jo.getString("image_url")
             MangaPage(
@@ -173,16 +174,11 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                 val count = inflater.inflate(buffer)
                 outputStream.write(buffer, 0, count)
             }
-            outputStream.close()
             return outputStream.toByteArray()
         }
     }
 
-    private fun parseChapterDate(date: String): Long {
-        return try {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(date)?.time ?: 0L
-        } catch (e: Exception) {
-            0L
-        }
+    private fun parseChapterDate(dateString: String): Date? {
+        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(dateString)
     }
 }
