@@ -19,7 +19,7 @@ import java.util.*
 import java.util.zip.Inflater
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
-internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
+internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
 
@@ -34,8 +34,6 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         .build()
 
     private val decryptionKey = "3141592653589793"
-
-    override val itemsPerPage = 20  // Define itemsPerPage if not inherited from the parent class
 
     override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
 
@@ -105,7 +103,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                     number = jo.getInt("number"),
                     url = "/api/v2/chapters/${jo.getLong("id")}",
                     scanlator = jo.optString("group_name"),
-                    uploadDate = parseChapterDate(jo.getString("created_at")),
+                    uploadDate = parseChapterDate(jo.getString("created_at"))?.time ?: 0L,
                     branch = null,
                     source = source,
                 )
@@ -178,7 +176,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         }
     }
 
-    private fun parseChapterDate(dateString: String): Date? {
-        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(dateString)
+    private fun parseChapterDate(dateString: String): Long {
+        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(dateString)?.time ?: 0L
     }
 }
