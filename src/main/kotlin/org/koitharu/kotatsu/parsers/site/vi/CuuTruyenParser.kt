@@ -11,7 +11,10 @@ import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
+import org.koitharu.kotatsu.parsers.exception.ParseException
+import org.koitharu.kotatsu.parsers.network.UserAgents
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.Inflater
 
@@ -19,6 +22,7 @@ import java.util.zip.Inflater
 internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
+    override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
@@ -27,8 +31,13 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         SortOrder.ALPHABETICAL,
     )
 
+    override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
+        super.onCreateConfig(keys)
+        keys.add(userAgentKey)
+    }
+
     override fun getRequestHeaders(): Headers = Headers.Builder()
-        .add("User-Agent", UserAgents.CHROME_DESKTOP)
+        .add("User-Agent", config[userAgentKey])
         .add("Referer", domain)
         .build()
 
