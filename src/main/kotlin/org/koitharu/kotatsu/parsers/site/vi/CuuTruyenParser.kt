@@ -44,14 +44,15 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
 
     private val decryptionKey = "3141592653589793"
 
-    override val interceptor: Interceptor = CuuTruyenImageInterceptor()
+    override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
 
-    override suspend fun getListPage(
-        page: Int,
+    override suspend fun getList(
+        offset: Int,
         query: String?,
         tags: Set<MangaTag>?,
         sortOrder: SortOrder,
     ): List<Manga> {
+        val page = offset / itemsPerPage + 1
         val url = buildString {
             if (!query.isNullOrEmpty()) {
                 append("$domain/api/v2/mangas/search")
@@ -59,7 +60,8 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                 append(query.urlEncoded())
                 append("&page=")
                 append(page)
-                append("&per_page=30")
+                append("&per_page=")
+                append(itemsPerPage)
             } else {
                 append("$domain/api/v2/mangas")
                 when (sortOrder) {
