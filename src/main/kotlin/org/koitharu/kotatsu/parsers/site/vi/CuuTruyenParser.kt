@@ -34,10 +34,11 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         .build()
 
     private val decryptionKey = "3141592653589793"
+    private val itemsPerPage: Int = 20
 
     override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
 
-    override suspend fun getList(
+    override suspend fun getListPage(
         offset: Int,
         query: String?,
         tags: Set<MangaTag>?,
