@@ -19,7 +19,7 @@ import java.util.*
 import java.util.zip.Inflater
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
-internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
+internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
 	
@@ -34,10 +34,11 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         .build()
 
     private val decryptionKey = "3141592653589793"
-
+	override val itemsPerPage = 20
+	
     override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
-    
-    override suspend fun getList(
+
+    override suspend fun getListPage(
         offset: Int,
         query: String?,
         tags: Set<MangaTag>?,
@@ -50,9 +51,9 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                 append("?q=")
                 append(query.urlEncoded())
                 append("&page=")
-                append(page)
+                append(page.toString())
                 append("&per_page=")
-                append(itemsPerPage)
+                append(itemsPerPage.toString())
             } else {
                 append("$domain/api/v2/mangas")
                 when (sortOrder) {
@@ -62,7 +63,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                     else -> append("/recently_updated")
                 }
                 append("?page=")
-                append(page)
+                append(page.toString())
             }
         }
 
