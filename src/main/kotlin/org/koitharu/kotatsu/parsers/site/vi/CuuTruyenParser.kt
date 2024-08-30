@@ -19,15 +19,9 @@ import java.util.*
 import java.util.zip.Inflater
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
-internal class CuuTruyen(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
+internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
-    override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
-
-    override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
-        super.onCreateConfig(keys)
-        keys.add(userAgentKey)
-    }
 	
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
@@ -36,14 +30,13 @@ internal class CuuTruyen(context: MangaLoaderContext) : PagedMangaParser(context
     )
 
     override fun getRequestHeaders(): Headers = Headers.Builder()
-        .add("User-Agent", config[userAgentKey])
-        .add("Referer", domain)
+        .add("User-Agent", UserAgents.KOTATSU)
         .build()
 
     private val decryptionKey = "3141592653589793"
 
     override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
-
+    
     override suspend fun getList(
         offset: Int,
         query: String?,
