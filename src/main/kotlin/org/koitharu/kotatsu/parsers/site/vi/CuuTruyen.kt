@@ -1,5 +1,6 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
+import androidx.collection.ArrayMap
 import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -7,6 +8,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.PagedMangaParser
+import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
@@ -19,26 +21,18 @@ import java.util.*
 import java.util.zip.Inflater
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
-internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
+internal class CuuTruyen(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
-
-    override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
         SortOrder.POPULARITY,
         SortOrder.NEWEST,
-        SortOrder.ALPHABETICAL,
     )
 
-    override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
-        super.onCreateConfig(keys)
-        keys.add(userAgentKey)
-    }
-
     override fun getRequestHeaders(): Headers = Headers.Builder()
-        .add("User-Agent", config[userAgentKey])
+        .add("User-Agent", UserAgents.KOTATSU)
         .add("Referer", domain)
         .build()
 
