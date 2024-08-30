@@ -22,6 +22,7 @@ import java.util.zip.Inflater
 internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(context, MangaSource.CUUTRUYEN, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("cuutruyen.net")
+
     override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
@@ -43,9 +44,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
 
     private val decryptionKey = "3141592653589793"
 
-    override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
-
-    override fun getInterceptor(): Interceptor = CuuTruyenImageInterceptor()
+    override val interceptor: Interceptor = CuuTruyenImageInterceptor()
 
     override suspend fun getListPage(
         page: Int,
@@ -65,9 +64,8 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
                 append("$domain/api/v2/mangas")
                 when (sortOrder) {
                     SortOrder.UPDATED -> append("/recently_updated")
-                    SortOrder.POPULARITY -> append("/most_viewed")
-                    SortOrder.NEWEST -> append("/latest")
-                    SortOrder.ALPHABETICAL -> append("/az")
+                    SortOrder.POPULARITY -> append("/top")
+                    SortOrder.NEWEST -> append("/recently_updated")
                     else -> append("/recently_updated")
                 }
                 append("?page=")
@@ -75,10 +73,10 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
             }
         }
 
-        val json = webClient.httpGet(url).parseJson().getJSONObject("data")
-            ?: throw ParseException("Invalid response", url)
+        val json = webClient.httpGet(url).parseJson()
+        val data = json.optJSONObject("data") ?: throw ParseException("Invalid response", url)
         
-        return json.getJSONArray("data").mapJSON { jo ->
+        return data.getJSONArray("data").mapJSON { jo ->
             Manga(
                 id = generateUid(jo.getLong("id")),
                 url = "/api/v2/mangas/${jo.getLong("id")}",
@@ -186,6 +184,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun parseChapterDate(date: String): Long {
         return try {
             SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(date)?.time ?: 0L
