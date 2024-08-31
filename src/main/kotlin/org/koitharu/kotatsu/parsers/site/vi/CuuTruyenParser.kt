@@ -143,14 +143,12 @@ internal class CuuTruyenParser(context: MangaLoaderContext) : PagedMangaParser(c
         val decrypted = try {
             decrypt(bytes)
         } catch (e: Exception) {
-            context.logException(e)
             bytes
         }
 
         val decompressed = try {
             decompress(decrypted)
         } catch (e: Exception) {
-            context.logException(e)
             decrypted
         }
 
