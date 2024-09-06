@@ -1,6 +1,6 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
-import android.util.Base64
+import java.util.Base64
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import okhttp3.Headers
@@ -147,7 +147,6 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
                 url = imageUrl,
                 preview = null,
                 source = source,
-                extra = mapOf("drm_data" to drmData)
             )
         }
     }
@@ -165,7 +164,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         val bytes = body.bytes()
 
         val decrypted = try {
-            val drmData = request.tag(MangaPage::class.java)?.extra?.get("drm_data") as? String
+            val drmData = request.url.queryParameter("drm_data")
             val processedDrmData = drmData?.let { processDrmData(it) }
             decompress(decrypt(bytes, processedDrmData))
         } catch (e: Exception) {
@@ -176,7 +175,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
     }
 
     private fun processDrmData(drmData: String): ByteArray {
-        return Base64.decode(drmData, Base64.DEFAULT)
+        return Base64.getDecoder().decode(drmData)
     }
 
     private fun decrypt(input: ByteArray, drmData: ByteArray?): ByteArray {
