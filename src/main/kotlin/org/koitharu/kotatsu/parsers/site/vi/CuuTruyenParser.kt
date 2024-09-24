@@ -1,6 +1,5 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
-import java.util.Base64
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import okhttp3.Headers
@@ -19,47 +18,57 @@ import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.Inflater
+import java.util.Base64
+import javax.imageio.ImageIO
+import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
 internal class CuuTruyenParser(context: MangaLoaderContext) :
-	PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20), Interceptor {
+    PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20), Interceptor {
 
-	override val configKeyDomain =
-		ConfigKey.Domain("cuutruyen.net", "nettrom.com", "hetcuutruyen.net", "cuutruyent9sv7.xyz")
+    override val configKeyDomain =
+        ConfigKey.Domain("cuutruyen.net", "nettrom.com", "hetcuutruyen.net", "cuutruyent9sv7.xyz")
 
-	override val availableSortOrders: Set<SortOrder> = EnumSet.of(
-		SortOrder.UPDATED,
-		SortOrder.POPULARITY,
-		SortOrder.NEWEST,
-	)
+    override val availableSortOrders: Set<SortOrder> = EnumSet.of(
+        SortOrder.UPDATED,
+        SortOrder.POPULARITY,
+        SortOrder.NEWEST,
+    )
 
-	override fun getRequestHeaders(): Headers = Headers.Builder()
-		.add("User-Agent", UserAgents.KOTATSU)
-		.build()
+    override val filterCapabilities: MangaListFilterCapabilities
+        get() = MangaListFilterCapabilities(
+            isSearchSupported = true,
+        )
 
-	private val decryptionKey = "3141592653589793"
+    override suspend fun getFilterOptions() = MangaListFilterOptions()
 
-    override suspend fun getAvailableTags(): Set<MangaTag> = emptySet()
+    override fun getRequestHeaders(): Headers = Headers.Builder()
+        .add("User-Agent", UserAgents.KOTATSU)
+        .build()
 
-    override suspend fun getListPage(page: Int, filter: MangaListFilter?): List<Manga> {
+    private val decryptionKey = "3141592653589793"
+
+    override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
         val url = buildString {
             append("https://")
             append(domain)
-            when (filter) {
-                is MangaListFilter.Search -> {
+            when {
+                !filter.query.isNullOrEmpty() -> {
                     append("/api/v2/mangas/search?q=")
                     append(filter.query.urlEncoded())
                     append("&page=")
                     append(page.toString())
                 }
+
                 else -> {
-                    val tag = (filter as? MangaListFilter.Advanced)?.tags?.oneOrThrowIfMany()
+                    val tag = filter.tags.oneOrThrowIfMany()
                     if (tag != null) {
                         append("/api/v2/tags/")
                         append(tag.key)
                     } else {
                         append("/api/v2/mangas")
-                        when (filter?.sortOrder) {
+                        when (order) {
                             SortOrder.UPDATED -> append("/recently_updated")
                             SortOrder.POPULARITY -> append("/top")
                             SortOrder.NEWEST -> append("/recently_updated")
@@ -70,6 +79,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
                     append(page.toString())
                 }
             }
+
             append("&per_page=")
             append(pageSize)
         }
@@ -97,13 +107,13 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         }
     }
 
-	override suspend fun getDetails(manga: Manga): Manga = coroutineScope {
-		val url = "https://" + domain + manga.url
-		val chapters = async {
-			webClient.httpGet("$url/chapters").parseJson().getJSONArray("data")
-		}
-		val json = webClient.httpGet(url).parseJson().getJSONObject("data")
-		val chapterDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+    override suspend fun getDetails(manga: Manga): Manga = coroutineScope {
+        val url = "https://" + domain + manga.url
+        val chapters = async {
+            webClient.httpGet("$url/chapters").parseJson().getJSONArray("data")
+        }
+        val json = webClient.httpGet(url).parseJson().getJSONObject("data")
+        val chapterDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
 
         manga.copy(
             title = json.getStringOrNull("name") ?: manga.title,
@@ -135,6 +145,98 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         )
     }
 
+    private fun decryptDRM(drmData: String, key: ByteArray): ByteArray? {
+        val decodedData = try {
+            Base64.getDecoder().decode(drmData)
+        } catch (e: IllegalArgumentException) {
+            return null
+        }
+
+        return decodedData.mapIndexed { index, byte ->
+            (byte.toInt() xor key[index % key.size].toInt()).toByte()
+        }.toByteArray()
+    }
+
+    private fun reconstructImage(imageData: ByteArray, decrypted: ByteArray, oriWidth: Int, oriHeight: Int): BufferedImage? {
+        val delimiter = "#v4|".toByteArray()
+        val delimiterIndex = decrypted.indexOfSlice(delimiter)
+        if (delimiterIndex == -1) {
+            return null
+        }
+
+        val segmentsInfoStart = delimiterIndex + delimiter.size
+        val segments = mutableListOf<String>()
+        var currentPos = segmentsInfoStart
+        while (true) {
+            val nextPipe = decrypted.indexOf('|'.toByte(), currentPos)
+            if (nextPipe == -1) {
+                val segment = String(decrypted, currentPos, decrypted.size - currentPos)
+                if ('-' in segment) {
+                    segments.add(segment)
+                }
+                break
+            }
+            val segment = String(decrypted, currentPos, nextPipe - currentPos)
+            if ('-' in segment) {
+                segments.add(segment)
+                currentPos = nextPipe + 1
+            } else {
+                break
+            }
+        }
+
+        if (segments.isEmpty()) {
+            return null
+        }
+
+        val segmentInfo = segments.mapNotNull { seg ->
+            val parts = seg.split('-')
+            if (parts.size == 2) {
+                val dy = parts[0].removePrefix("dy").trim().toIntOrNull()
+                val height = parts[1].trim().toIntOrNull()
+                if (dy != null && height != null) {
+                    dy to height
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+
+        val image = ImageIO.read(ByteArrayInputStream(imageData))
+        val width = oriWidth
+        val heightImage = oriHeight
+
+        val totalHeight = segmentInfo.sumOf { it.second }
+        if (totalHeight != heightImage) {
+            val remainingHeight = heightImage - totalHeight
+            if (remainingHeight > 0) {
+                segmentInfo.add(0 to remainingHeight)
+            }
+        }
+
+        val newImage = BufferedImage(width, heightImage, BufferedImage.TYPE_INT_RGB)
+        val graphics = newImage.createGraphics()
+
+        var sy = 0
+        for ((dy, segHeight) in segmentInfo) {
+            if (sy + segHeight > heightImage) {
+                break
+            }
+            val segment = image.getSubimage(0, sy, width, segHeight)
+            if (dy < 0 || dy + segHeight > heightImage) {
+                sy += segHeight
+                continue
+            }
+            graphics.drawImage(segment, 0, dy, null)
+            sy += segHeight
+        }
+
+        graphics.dispose()
+        return newImage
+    }
+
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val url = "https://$domain${chapter.url}"
         val json = webClient.httpGet(url).parseJson().getJSONObject("data")
@@ -142,13 +244,26 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         return json.getJSONArray("pages").mapJSON { jo ->
             val imageUrl = jo.getString("image_url")
             val drmData = jo.getString("drm_data")
+            val oriWidth = jo.getInt("width")
+            val oriHeight = jo.getInt("height")
+
+            val response = webClient.httpGet(imageUrl)
+            val imageData = response.body?.bytes() ?: return@mapJSON null
+
+            val decrypted = decryptDRM(drmData, decryptionKey.toByteArray()) ?: return@mapJSON null
+
+            val reconstructedImage = reconstructImage(imageData, decrypted, oriWidth, oriHeight) ?: return@mapJSON null
+            val outputStream = ByteArrayOutputStream()
+            ImageIO.write(reconstructedImage, "jpg", outputStream)
+            val reconstructedImageData = outputStream.toByteArray()
+
             MangaPage(
                 id = generateUid(jo.getLong("id")),
                 url = imageUrl,
-                preview = null,
+                preview = reconstructedImageData,
                 source = source,
             )
-        }
+        }.filterNotNull()
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -164,9 +279,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         val bytes = body.bytes()
 
         val decrypted = try {
-            val drmData = request.url.queryParameter("drm_data")
-            val processedDrmData = drmData?.let { processDrmData(it) }
-            decompress(decrypt(bytes, processedDrmData))
+            decompress(decrypt(bytes))
         } catch (e: Exception) {
             bytes
         }
@@ -174,16 +287,10 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         return response.newBuilder().body(newBody).build()
     }
 
-    private fun processDrmData(drmData: String): ByteArray {
-        return Base64.getDecoder().decode(drmData)
-    }
-
-    private fun decrypt(input: ByteArray, drmData: ByteArray?): ByteArray {
+    private fun decrypt(input: ByteArray): ByteArray {
         val key = decryptionKey.toByteArray()
         return input.mapIndexed { index, byte ->
-            val keyByte = key[index % key.size]
-            val drmByte = drmData?.getOrNull(index) ?: 0
-            (byte.toInt() xor keyByte.toInt() xor drmByte.toInt()).toByte()
+            (byte.toInt() xor key[index % key.size].toInt()).toByte()
         }.toByteArray()
     }
 
