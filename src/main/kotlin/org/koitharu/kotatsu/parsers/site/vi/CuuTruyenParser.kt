@@ -157,8 +157,8 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
                 url = imageUrl,
                 preview = null,
                 source = source,
-                site_width = originalWidth,
-                site_height = originalHeight,
+                width = originalWidth,
+                height = originalHeight,
             )
         }
     }
@@ -175,6 +175,9 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         val contentType = body.contentType()
         val bytes = body.bytes()
 
+        val originalWidth = getOriginalWidthFromRequest(request)
+        val originalHeight = getOriginalHeightFromRequest(request)
+
         val decrypted = decryptDRM(bytes, decryptionKey)
         val reconstructed = decrypted?.let {
             reconstructImage(it, originalWidth = originalWidth, originalHeight = originalHeight)
@@ -184,12 +187,12 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         return response.newBuilder().body(newBody).build()
     }
 
-    private fun getOriginalWidthFromRequest(request: Request): Int {
+    private fun getOriginalWidthFromRequest(request: okhttp3.Request): Int {
         val width = request.url.queryParameter("width")?.toIntOrNull() ?: 0
         return width
     }
 
-    private fun getOriginalHeightFromRequest(request: Request): Int {
+    private fun getOriginalHeightFromRequest(request: okhttp3.Request): Int {
         val height = request.url.queryParameter("height")?.toIntOrNull() ?: 0
         return height
     }
