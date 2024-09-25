@@ -155,8 +155,8 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
                 url = imageUrl,
                 preview = null,
                 source = source,
-                site_width = width,
-                site_height = height,
+                site_width = jo.getInt("width"),
+                site_height = jo.getInt("height"),
             )
         }
     }
