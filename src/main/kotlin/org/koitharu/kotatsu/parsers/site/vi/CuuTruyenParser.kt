@@ -5,6 +5,7 @@ import kotlinx.coroutines.coroutineScope
 import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.Response
+import okhttp3.HttpUrl
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
@@ -24,7 +25,7 @@ import javax.imageio.ImageIO
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
 internal class CuuTruyenParser(context: MangaLoaderContext) :
-    PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20), Interceptor {
+	PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20), Interceptor {
 
     override val configKeyDomain =
         ConfigKey.Domain("cuutruyen.net", "nettrom.com", "hetcuutruyen.net", "cuutruyent9sv7.xyz")
@@ -144,7 +145,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         )
     }
 
-    private val pageSize = mutableMapOf<Long, Pair<Int, Int>>()
+    override val pageSize = mutableMapOf<Long, Pair<Int, Int>>()
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val url = "https://$domain${chapter.url}"
