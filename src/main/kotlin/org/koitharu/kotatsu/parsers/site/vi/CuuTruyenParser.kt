@@ -150,13 +150,15 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 
         return json.getJSONArray("pages").mapJSON { jo ->
             val imageUrl = jo.getString("image_url")
+            val originalWidth = jo.getInt("width")
+            val originalHeight = jo.getInt("height")
             MangaPage(
                 id = generateUid(jo.getLong("id")),
                 url = imageUrl,
                 preview = null,
                 source = source,
-                site_width = jo.getInt("width"),
-                site_height = jo.getInt("height"),
+                site_width = originalWidth,
+                site_height = originalHeight,
             )
         }
     }
@@ -175,8 +177,6 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 
         val decrypted = decryptDRM(bytes, decryptionKey)
         val reconstructed = decrypted?.let {
-            val originalWidth = getOriginalWidthFromRequest(request)
-            val originalHeight = getOriginalHeightFromRequest(request)
             reconstructImage(it, originalWidth = originalWidth, originalHeight = originalHeight)
         } ?: bytes
 
