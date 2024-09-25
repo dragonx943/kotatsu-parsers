@@ -144,21 +144,21 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         )
     }
 
+    private val pageSize = mutableMapOf<Long, Pair<Int, Int>>()
+
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val url = "https://$domain${chapter.url}"
         val json = webClient.httpGet(url).parseJson().getJSONObject("data")
 
         return json.getJSONArray("pages").mapJSON { jo ->
             val imageUrl = jo.getString("image_url")
-            val originalWidth = jo.getInt("width")
-            val originalHeight = jo.getInt("height")
+            val id = jo.getLong("id")
+            pageSize[id] = jo.getInt("width") to jo.getInt("height")
             MangaPage(
-                id = generateUid(jo.getLong("id")),
+                id = generateUid(id),
                 url = imageUrl,
                 preview = null,
                 source = source,
-                width = originalWidth,
-                height = originalHeight,
             )
         }
     }
@@ -175,16 +175,20 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         val contentType = body.contentType()
         val bytes = body.bytes()
 
-        val originalWidth = getOriginalWidthFromRequest(request)
-        val originalHeight = getOriginalHeightFromRequest(request)
+        val pageId = getPageIdFromUrl(request.url)
+        val (originalWidth, originalHeight) = pageSize[pageId] ?: (0 to 0)
 
         val decrypted = decryptDRM(bytes, decryptionKey)
         val reconstructed = decrypted?.let {
-            reconstructImage(it, originalWidth = originalWidth, originalHeight = originalHeight)
+        reconstructImage(it, originalWidth, originalHeight)
         } ?: bytes
 
         val newBody = reconstructed.toResponseBody(contentType)
         return response.newBuilder().body(newBody).build()
+    }
+
+    private fun getPageIdFromUrl(url: HttpUrl): Long {
+        return url.pathSegments.lastOrNull()?.toLongOrNull() ?: 0L
     }
 
     private fun getOriginalWidthFromRequest(request: okhttp3.Request): Int {
