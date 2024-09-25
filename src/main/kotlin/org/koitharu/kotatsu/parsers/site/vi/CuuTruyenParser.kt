@@ -175,11 +175,23 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 
         val decrypted = decryptDRM(bytes, decryptionKey)
         val reconstructed = decrypted?.let {
-            reconstructImage(it, originalWidth = site_width, originalHeight = site_height)
+            val originalWidth = getOriginalWidthFromRequest(request)
+            val originalHeight = getOriginalHeightFromRequest(request)
+            reconstructImage(it, originalWidth = originalWidth, originalHeight = originalHeight)
         } ?: bytes
 
         val newBody = reconstructed.toResponseBody(contentType)
         return response.newBuilder().body(newBody).build()
+    }
+
+    private fun getOriginalWidthFromRequest(request: Request): Int {
+        val width = request.url.queryParameter("width")?.toIntOrNull() ?: 0
+        return width
+    }
+
+    private fun getOriginalHeightFromRequest(request: Request): Int {
+        val height = request.url.queryParameter("height")?.toIntOrNull() ?: 0
+        return height
     }
 
     private fun decryptDRM(drmData: ByteArray, key: ByteArray): ByteArray? {
