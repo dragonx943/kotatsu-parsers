@@ -18,10 +18,11 @@ import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.Inflater
-import java.util.Base64
-import javax.imageio.ImageIO
-import java.awt.image.BufferedImage
-import java.io.ByteArrayInputStream
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 
 @MangaSourceParser("CUUTRUYEN", "CuuTruyen", "vi")
 internal class CuuTruyenParser(context: MangaLoaderContext) :
@@ -145,125 +146,19 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         )
     }
 
-    private fun decryptDRM(drmData: String, key: ByteArray): ByteArray? {
-        val decodedData = try {
-            Base64.getDecoder().decode(drmData)
-        } catch (e: IllegalArgumentException) {
-            return null
-        }
-
-        return decodedData.mapIndexed { index, byte ->
-            (byte.toInt() xor key[index % key.size].toInt()).toByte()
-        }.toByteArray()
-    }
-
-    private fun reconstructImage(imageData: ByteArray, decrypted: ByteArray, oriWidth: Int, oriHeight: Int): BufferedImage? {
-        val delimiter = "#v4|".toByteArray()
-        val delimiterIndex = decrypted.indexOfSlice(delimiter)
-        if (delimiterIndex == -1) {
-            return null
-        }
-
-        val segmentsInfoStart = delimiterIndex + delimiter.size
-        val segments = mutableListOf<String>()
-        var currentPos = segmentsInfoStart
-        while (true) {
-            val nextPipe = decrypted.indexOf('|'.toByte(), currentPos)
-            if (nextPipe == -1) {
-                val segment = String(decrypted, currentPos, decrypted.size - currentPos)
-                if ('-' in segment) {
-                    segments.add(segment)
-                }
-                break
-            }
-            val segment = String(decrypted, currentPos, nextPipe - currentPos)
-            if ('-' in segment) {
-                segments.add(segment)
-                currentPos = nextPipe + 1
-            } else {
-                break
-            }
-        }
-
-        if (segments.isEmpty()) {
-            return null
-        }
-
-        val segmentInfo = segments.mapNotNull { seg ->
-            val parts = seg.split('-')
-            if (parts.size == 2) {
-                val dy = parts[0].removePrefix("dy").trim().toIntOrNull()
-                val height = parts[1].trim().toIntOrNull()
-                if (dy != null && height != null) {
-                    dy to height
-                } else {
-                    null
-                }
-            } else {
-                null
-            }
-        }
-
-        val image = ImageIO.read(ByteArrayInputStream(imageData))
-        val width = oriWidth
-        val heightImage = oriHeight
-
-        val totalHeight = segmentInfo.sumOf { it.second }
-        if (totalHeight != heightImage) {
-            val remainingHeight = heightImage - totalHeight
-            if (remainingHeight > 0) {
-                segmentInfo.add(0 to remainingHeight)
-            }
-        }
-
-        val newImage = BufferedImage(width, heightImage, BufferedImage.TYPE_INT_RGB)
-        val graphics = newImage.createGraphics()
-
-        var sy = 0
-        for ((dy, segHeight) in segmentInfo) {
-            if (sy + segHeight > heightImage) {
-                break
-            }
-            val segment = image.getSubimage(0, sy, width, segHeight)
-            if (dy < 0 || dy + segHeight > heightImage) {
-                sy += segHeight
-                continue
-            }
-            graphics.drawImage(segment, 0, dy, null)
-            sy += segHeight
-        }
-
-        graphics.dispose()
-        return newImage
-    }
-
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val url = "https://$domain${chapter.url}"
         val json = webClient.httpGet(url).parseJson().getJSONObject("data")
 
         return json.getJSONArray("pages").mapJSON { jo ->
             val imageUrl = jo.getString("image_url")
-            val drmData = jo.getString("drm_data")
-            val oriWidth = jo.getInt("width")
-            val oriHeight = jo.getInt("height")
-
-            val response = webClient.httpGet(imageUrl)
-            val imageData = response.body?.bytes() ?: return@mapJSON null
-
-            val decrypted = decryptDRM(drmData, decryptionKey.toByteArray()) ?: return@mapJSON null
-
-            val reconstructedImage = reconstructImage(imageData, decrypted, oriWidth, oriHeight) ?: return@mapJSON null
-            val outputStream = ByteArrayOutputStream()
-            ImageIO.write(reconstructedImage, "jpg", outputStream)
-            val reconstructedImageData = outputStream.toByteArray()
-
             MangaPage(
                 id = generateUid(jo.getLong("id")),
                 url = imageUrl,
-                preview = reconstructedImageData,
+                preview = null,
                 source = source,
             )
-        }.filterNotNull()
+        }
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -278,31 +173,99 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         val contentType = body.contentType()
         val bytes = body.bytes()
 
-        val decrypted = try {
-            decompress(decrypt(bytes))
-        } catch (e: Exception) {
-            bytes
-        }
-        val newBody = decrypted.toResponseBody(contentType)
+        val decrypted = decryptDRM(bytes, decryptionKey.toByteArray())
+        val reconstructed = decrypted?.let {
+            reconstructImage(it, originalWidth = 800, originalHeight = 1200) // Bạn cần lấy kích thước gốc phù hợp
+        } ?: bytes
+
+        val newBody = reconstructed.toResponseBody(contentType)
         return response.newBuilder().body(newBody).build()
     }
 
-    private fun decrypt(input: ByteArray): ByteArray {
-        val key = decryptionKey.toByteArray()
-        return input.mapIndexed { index, byte ->
-            (byte.toInt() xor key[index % key.size].toInt()).toByte()
-        }.toByteArray()
+    private fun decryptDRM(drmData: ByteArray, key: ByteArray): ByteArray? {
+        return try {
+            drmData.mapIndexed { index, byte ->
+                (byte.toInt() xor key[index % key.size].toInt()).toByte()
+            }.toByteArray()
+        } catch (e: Exception) {
+            null
+        }
     }
 
-    private fun decompress(input: ByteArray): ByteArray {
-        val inflater = Inflater()
-        inflater.setInput(input, 0, input.size)
-        val outputStream = ByteArrayOutputStream(input.size)
-        val buffer = ByteArray(1024)
-        while (!inflater.finished()) {
-            val count = inflater.inflate(buffer)
-            outputStream.write(buffer, 0, count)
+    private fun reconstructImage(decrypted: ByteArray, originalWidth: Int, originalHeight: Int): ByteArray? {
+        return try {
+            val delimiter = "#v".toByteArray()
+            val delimiterIndex = decrypted.indexOfFirst { 
+                decrypted.sliceArray(it until it + delimiter.size) contentEquals delimiter 
+            }
+            if (delimiterIndex == -1) {
+                return null
+            }
+
+            val segmentsInfoStart = delimiterIndex + delimiter.size
+            val segmentsData = decrypted.sliceArray(segmentsInfoStart until decrypted.size)
+            val segments = String(segmentsData).split("|").filter { it.contains("-") }
+
+            if (segments.isEmpty()) {
+                return null
+            }
+
+            val segmentInfo = segments.mapNotNull { seg ->
+                try {
+                    val (dyStr, heightStr) = seg.split("-")
+                    val dy = if (dyStr.startsWith("dy")) dyStr.substring(2).trim().toInt() else dyStr.trim().toInt()
+                    val height = heightStr.trim().toInt()
+                    Pair(dy, height)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            if (segmentInfo.isEmpty()) {
+                return null
+            }
+
+            val totalHeight = segmentInfo.sumBy { it.second }
+            val finalSegmentInfo = if (totalHeight != originalHeight) {
+                val remainingHeight = originalHeight - totalHeight
+                if (remainingHeight > 0) {
+                    segmentInfo.toMutableList().apply { add(Pair(0, remainingHeight)) }
+                } else {
+                    segmentInfo
+                }
+            } else {
+                segmentInfo
+            }
+
+            val originalBitmap = BitmapFactory.decodeByteArray(decrypted, 0, decrypted.size)?.copy(Bitmap.Config.RGB_565, true)
+            if (originalBitmap == null) return null
+            val newBitmap = Bitmap.createBitmap(originalWidth, originalHeight, Bitmap.Config.RGB_565)
+            val canvas = Canvas(newBitmap)
+            val paint = Paint()
+
+            var sy = 0
+            for ((dy, segHeight) in finalSegmentInfo) {
+                if (sy + segHeight > originalHeight) {
+                    break
+                }
+                val srcRect = Rect(0, sy, originalWidth, sy + segHeight)
+                val destRect = Rect(0, dy, originalWidth, dy + segHeight)
+                canvas.drawBitmap(originalBitmap, srcRect, destRect, paint)
+                sy += segHeight
+            }
+
+            val outputStream = ByteArrayOutputStream()
+            newBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+            outputStream.toByteArray()
+        } catch (e: Exception) {
+            null
         }
-        return outputStream.toByteArray()
+    }
+
+    private fun ByteArray.indexOfFirst(predicate: (Int) -> Boolean): Int {
+        for (i in indices) {
+            if (predicate(i)) return i
+        }
+        return -1
     }
 }
