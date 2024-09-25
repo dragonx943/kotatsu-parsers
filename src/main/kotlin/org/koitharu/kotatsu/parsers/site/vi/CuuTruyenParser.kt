@@ -145,7 +145,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         )
     }
 
-    override val pageSize = mutableMapOf<Long, Pair<Int, Int>>()
+    private val pageSizesMap = mutableMapOf<Long, Pair<Int, Int>>()
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val url = "https://$domain${chapter.url}"
@@ -154,7 +154,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         return json.getJSONArray("pages").mapJSON { jo ->
             val imageUrl = jo.getString("image_url")
             val id = jo.getLong("id")
-            pageSize[id] = jo.getInt("width") to jo.getInt("height")
+            pageSizesMap[id] = jo.getInt("width") to jo.getInt("height")
             MangaPage(
                 id = generateUid(id),
                 url = imageUrl,
@@ -177,7 +177,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
         val bytes = body.bytes()
 
         val pageId = getPageIdFromUrl(request.url)
-        val (originalWidth, originalHeight) = pageSize[pageId] ?: (0 to 0)
+        val (originalWidth, originalHeight) = pageSizesMap[pageId] ?: (0 to 0)
 
         val decrypted = decryptDRM(bytes, decryptionKey)
         val reconstructed = decrypted?.let {
