@@ -14,10 +14,7 @@ import org.koitharu.kotatsu.parsers.Broken
 @Broken
 @MangaSourceParser("LXMANGA", "LxManga", "vi")
 internal class LxManga(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.LXMANGA, 60) {
-
 	override val configKeyDomain = ConfigKey.Domain("lxmanga.online")
-
-	override val userAgentKey = ConfigKey.UserAgent(UserAgents.CHROME_DESKTOP)
 
 	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)
@@ -180,10 +177,10 @@ internal class LxManga(context: MangaLoaderContext) : PagedMangaParser(context, 
 		val doc = webClient.httpGet("https://$domain/the-loai").parseHtml()
 		return doc.select("button span.text-ellipsis").mapToSet { span ->
 			val button = span.parent()
-			val wireClick = button?.attr("wire:click") ?: "default_value"
-			val tagId = wireClick.substringAfter("loadManga(").substringBefore(",").trim()
+			val wireClick = button?.attr("wire:click") ?: ""
+			val tagKey = wireClick.substringAfter("', '").substringBefore("')")
 			MangaTag(
-				key = tagId,
+				key = tagKey,
 				title = span.text(),
 				source = source,
 			)
