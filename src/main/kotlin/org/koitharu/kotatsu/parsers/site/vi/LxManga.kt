@@ -99,13 +99,13 @@ internal class LxManga(context: MangaLoaderContext) : PagedMangaParser(context, 
 
 		val doc = webClient.httpGet(url).parseHtml()
 
-		return doc.select("div.grid div.manga-vertical")
+		return doc.select("div.manga-item")
 			.map { div ->
 				val href = div.selectFirstOrThrow("a").attr("href")
-				val img = div.selectFirstOrThrow(".cover").attr("style").substringAfter("url('").substringBefore("')")
+            	val img = div.selectFirstOrThrow("img.cover").attr("data-src")
 				Manga(
 					id = generateUid(href),
-					title = div.selectFirstOrThrow("a.text-ellipsis").text(),
+					title = div.selectFirstOrThrow("h3.title").text(),
 					altTitle = null,
 					url = href,
 					publicUrl = href.toAbsoluteUrl(domain),
@@ -177,12 +177,14 @@ internal class LxManga(context: MangaLoaderContext) : PagedMangaParser(context, 
 	}
 
 	private suspend fun fetchAvailableTags(): Set<MangaTag> {
-		val doc = webClient.httpGet("https://$domain/").parseHtml()
-		val body = doc.body()
-		return body.select("ul.absolute.w-full a").mapToSet { a ->
+		val doc = webClient.httpGet("https://$domain/the-loai").parseHtml()
+		return doc.select("button span.text-ellipsis").mapToSet { span ->
+			val button = span.parent()
+			val wireClick = button?.attr("wire:click") ?: "default_value"
+			val tagId = wireClick.substringAfter("loadManga(").substringBefore(",").trim()
 			MangaTag(
-				key = a.attr("href").removeSuffix("/").substringAfterLast('/'),
-				title = a.selectFirstOrThrow("span.text-ellipsis").text(),
+				key = tagId,
+				title = span.text(),
 				source = source,
 			)
 		}
