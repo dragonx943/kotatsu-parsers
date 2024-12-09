@@ -119,14 +119,10 @@ internal class ComicExtra(context: MangaLoaderContext) : PagedMangaParser(contex
 			},
 			author = doc.selectFirst("table.full-table tr:contains(Author:) td:nth-child(2)")?.text(),
 			description = doc.selectFirstOrThrow("div.detail-desc-content p").text(),
-			chapters = doc.select("ul.basic-list li").mapIndexed { i, li ->
+			chapters = doc.select("ul.basic-list li").mapChapters(reversed = true) { i, li ->
 				val a = li.selectFirstOrThrow("a.ch-name")
 				val url = a.attrAsRelativeUrl("href")
 				val name = a.text()
-				val uploadDateText = li.selectFirst("span")?.text()
-				// val uploadDate = uploadDateText?.let { 
-				// 	SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH).parse(it)?.time 
-				// }
 				MangaChapter(
 					id = generateUid(url),
 					name = name,
@@ -143,8 +139,9 @@ internal class ComicExtra(context: MangaLoaderContext) : PagedMangaParser(contex
 	}
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
-		val fullUrl = chapter.url.toAbsoluteUrl(domain) + "/all"
+		val fullUrl = chapter.url.toAbsoluteUrl(domain) + "/full"
 		val doc = webClient.httpGet(fullUrl).parseHtml()
+		
 		return doc.select("div.chapter-container img").mapIndexed { index, img ->
 			val url = img.attr("src")
 			MangaPage(
