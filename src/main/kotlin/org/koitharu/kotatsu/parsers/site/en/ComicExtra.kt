@@ -119,7 +119,7 @@ internal class ComicExtra(context: MangaLoaderContext) : PagedMangaParser(contex
 			},
 			author = doc.selectFirst("table.full-table tr:contains(Author:) td:nth-child(2)")?.text(),
 			description = doc.selectFirstOrThrow("div.detail-desc-content p").text(),
-			chapters = doc.select("ul.basic-list li").mapChapters(reversed = true) { i, li ->
+			chapters = doc.select("ul.basic-list li").mapChapters(reversed = false) { i, li ->
 				val a = li.selectFirstOrThrow("a.ch-name")
 				val url = a.attrAsRelativeUrl("href")
 				val name = a.text()
@@ -142,14 +142,16 @@ internal class ComicExtra(context: MangaLoaderContext) : PagedMangaParser(contex
 		val fullUrl = chapter.url.toAbsoluteUrl(domain) + "/full"
 		val doc = webClient.httpGet(fullUrl).parseHtml()
 		
-		return doc.select("div.chapter-container img").mapIndexed { index, img ->
-			val url = img.attr("src")
-			MangaPage(
-				id = generateUid(url),
-				url = url,
-				preview = null,
-				source = source,
-			)
+		return doc.select("div.chapter-container img").mapNotNull { img ->
+			val url = img.attr("src")?.takeUnless { it.isBlank() }?.toAbsoluteUrl(domain)
+			url?.let {
+				MangaPage(
+					id = generateUid(url),
+					url = url,
+					preview = null,
+					source = source,
+				)
+			}
 		}
 	}
 }
