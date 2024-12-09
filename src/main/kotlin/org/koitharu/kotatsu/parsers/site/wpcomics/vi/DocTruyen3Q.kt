@@ -225,15 +225,15 @@ internal class DocTruyen3Q(context: MangaLoaderContext) :
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
 		val fullUrl = chapter.url.toAbsoluteUrl(domain)
 		val doc = webClient.httpGet(fullUrl).parseHtml()
-		return doc.select("div.page-chapter a img, div.page-chapter img").mapNotNull { img ->
-			val imageUrl = img.findImageUrl() ?: return@mapNotNull null
+		return doc.select("div.page-chapter img, div.page-chapter a img").mapNotNull { img ->
+			val url = img.findImageUrl()?.toRelativeUrl(domain) ?: return@mapNotNull null
 			MangaPage(
-				id = generateUid(imageUrl),
-				url = imageUrl.toRelativeUrl(domain),
+				id = generateUid(url),
+				url = url,
 				preview = null,
 				source = source
 			)
-		}.distinctBy { it.url }
+		}
 	}
 
 	private fun availableTags(): Set<MangaTag> = setOf(
