@@ -83,3 +83,5 @@ bin/
 src/test/resources/cookies.txt
 local.properties
 .kotlin/
+
+*.html
