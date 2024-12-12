@@ -19,6 +19,11 @@ internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, M
 
     override val userAgentKey = ConfigKey.UserAgent(UserAgents.KOTATSU)
 
+    override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
+		super.onCreateConfig(keys)
+		keys.add(userAgentKey)
+	}
+
     override val configKeyDomain = ConfigKey.Domain("cmangal.com")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
