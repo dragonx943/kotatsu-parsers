@@ -11,6 +11,7 @@ import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
+import org.koitharu.kotatsu.parsers.util.parseJson
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -63,7 +64,8 @@ internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, M
             }
         }
 
-        return parseMangaList(webClient.httpGet(url).parseJson())
+        val json = webClient.httpGet(url).parseJson()
+        return parseMangaList(json.getJSONArray("data"))
     }
 
     private suspend fun searchManga(query: String): List<Manga> {
@@ -73,11 +75,12 @@ internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, M
             append("/api/search?child_protect=0&string=")
             append(query.urlEncoded())
         }
-        return parseMangaList(webClient.httpGet(url).parseJson())
+        val json = webClient.httpGet(url).parseJson()
+        return parseMangaList(json.getJSONArray("data"))
     }
 
-    private suspend fun parseMangaList(json: JSONObject): List<Manga> {
-        return json.getJSONArray("data").mapJSON { item ->
+    private suspend fun parseMangaList(json: JSONArray): List<Manga> {
+        return json.mapJSON { item ->
             val info = JSONObject(item.getString("info"))
             Manga(
                 id = info.getLong("id"),
@@ -140,8 +143,8 @@ internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, M
             append("/api/chapter_list?page=1&limit=10000&album=")
             append(manga.id)
         }
-        val json = webClient.httpGet(url).parseJsonArray()
-        return json.mapJSON { item ->
+        val json = webClient.httpGet(url).parseJson()
+        return json.getJSONArray("data").mapJSON { item ->
             val info = JSONObject(item.getString("info"))
             MangaChapter(
                 id = generateUid(info.getString("id")),
