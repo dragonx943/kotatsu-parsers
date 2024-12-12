@@ -16,15 +16,13 @@ import java.util.*
 
 @MangaSourceParser("CMANGA", "CManga", "vi")
 internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.CMANGA, 50) {
-
-    override val userAgentKey = ConfigKey.UserAgent(UserAgents.KOTATSU)
+    
+    override val configKeyDomain = ConfigKey.Domain("cmangal.com")
 
     override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)
 		keys.add(userAgentKey)
 	}
-
-    override val configKeyDomain = ConfigKey.Domain("cmangal.com")
 
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.NEWEST,
