@@ -85,23 +85,16 @@ internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, M
             Manga(
                 id = info.getLong("id"),
                 url = info.getString("url"),
-                publicUrl = "https://$domain/book/${info.getLong("id")}",
+                publicUrl = "https://$domain/album/${info.getLong("url")}-${info.getLong("id")}",
                 title = info.getString("name"),
-                altTitle = null,
+                altTitle = info.optJSONArray("name_other")?.joinToString("\n"),
                 author = null,
-                tags = info.optJSONArray("tags")?.mapJSON { tag ->
-                    MangaTag(
-                        title = tag.toString(),
-                        key = tag.toString().lowercase(),
-                        source = source
-                    )
-                }?.toSet() ?: emptySet(),
+                tags = emptySet(), // will add later
                 state = when(info.optString("status")) {
                     "doing" -> MangaState.ONGOING
-                    "done" -> MangaState.FINISHED  
-                    else -> null
+                    else -> MangaState.FINISHED
                 },
-                coverUrl = "https://$domain/images/manga/${info.getString("avatar")}",
+                coverUrl = "https://$domain/assets/tmp/album/${info.getString("avatar")}",
                 rating = RATING_UNKNOWN,
                 isNsfw = false,
                 source = source
