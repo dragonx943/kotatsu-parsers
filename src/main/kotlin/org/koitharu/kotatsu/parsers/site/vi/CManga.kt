@@ -84,7 +84,7 @@ internal class CManga(context: MangaLoaderContext) : PagedMangaParser(context, M
             val info = JSONObject(item.getString("info"))
             Manga(
                 id = info.getLong("id"),
-                url = info.getString("url"),
+                url = "/api/get_data_by_id?table=album&data=info,file&id=${info.getLong("id")}",
                 publicUrl = "https://$domain/album/${info.getLong("url")}-${info.getLong("id")}",
                 title = info.getString("name"),
                 altTitle = info.optJSONArray("name_other")?.joinToString("\n"),
