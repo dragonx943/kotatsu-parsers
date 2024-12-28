@@ -16,9 +16,14 @@ internal class MeHentaiVN(context: MangaLoaderContext) :
 	
 	override val configKeyDomain: ConfigKey.Domain = ConfigKey.Domain("www.mehentaivn.xyz", "www.hentaivnx.autos")
 
-    private suspend fun fetchAvailableTags(): Set<MangaTag> {
+    override suspend fun getFilterOptions() = MangaListFilterOptions(
+		availableTags = fetchTags(),
+		availableStates = EnumSet.of(MangaState.ONGOING, MangaState.FINISHED),
+	)
+    
+    private suspend fun fetchTags(): Set<MangaTag> {
         val doc = webClient.httpGet(domain).parseHtml()
-        val tagItems = doc.select("a[data-title]")
+        val tagItems = doc.select("ul.nav li a")
         val tagSet = ArraySet<MangaTag>(tagItems.size)
         for (item in tagItems) {
             val title = item.attr("data-title")
