@@ -23,11 +23,11 @@ internal class MeHentaiVN(context: MangaLoaderContext) :
     
     private suspend fun fetchTags(): Set<MangaTag> {
         val doc = webClient.httpGet(domain).parseHtml()
-        val tagItems = doc.select("ul.nav li a")
+        val tagItems = doc.select("ul.dropdown-menu.megamenu li a")
         val tagSet = ArraySet<MangaTag>(tagItems.size)
         for (item in tagItems) {
-            val title = item.attr("data-title")
-            val key = item.attr("href").substringAfterLast('/')
+            val title = item.attr("data-title").trim()
+            val key = item.attr("href").substringAfterLast('/').trim()
             if (key.isNotEmpty() && title.isNotEmpty()) {
                 tagSet.add(MangaTag(title = title, key = key, source = source))
             }
