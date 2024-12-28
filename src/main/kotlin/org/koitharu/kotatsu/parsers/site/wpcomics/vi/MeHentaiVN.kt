@@ -22,7 +22,7 @@ internal class MeHentaiVN(context: MangaLoaderContext) :
 	)
     
     private suspend fun fetchTags(): Set<MangaTag> {
-        val doc = webClient.httpGet(domain).parseHtml()
+        val doc = webClient.httpGet("https://$domain/").parseHtml()
         val tagItems = doc.select("ul.dropdown-menu.megamenu li a")
         val tagSet = ArraySet<MangaTag>(tagItems.size)
         for (item in tagItems) {
