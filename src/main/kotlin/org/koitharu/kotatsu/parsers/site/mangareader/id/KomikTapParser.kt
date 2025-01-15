@@ -34,8 +34,8 @@ internal class KomikTapParser(context: MangaLoaderContext) :
 
 		return List(imagesJsonArray.length()) { i ->
 			var imageUrl = imagesJsonArray.getString(i)
-			if (imageUrl.startsWith("https://$domain")) {
-				imageUrl = imageUrl.removePrefix("https://$domain")
+			if (imageUrl.startsWith("https://komiktap.info/")) {
+				imageUrl = imageUrl.removePrefix("https://komiktap.info/")
 			}
 			if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
 				imageUrl = imageUrl
