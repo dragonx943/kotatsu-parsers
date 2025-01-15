@@ -25,17 +25,24 @@ internal class KomikTapParser(context: MangaLoaderContext) :
 			.firstOrNull { it.data().contains("ts_reader.run") }
 			?.data()
 			?: return emptyList()
-
 		val jsonPart = scriptContent.substringAfter("ts_reader.run(")
 			.substringBeforeLast(")")
-
 		val imagesJsonArray = JSONObject(jsonPart)
 			.getJSONArray("sources")
 			.getJSONObject(0)
 			.getJSONArray("images")
 
 		return List(imagesJsonArray.length()) { i ->
-			val imageUrl = imagesJsonArray.getString(i).toAbsoluteUrl(domain).removePrefix("https://$domain/")
+			var imageUrl = imagesJsonArray.getString(i)
+			if (imageUrl.startsWith("https://$domain")) {
+				imageUrl = imageUrl.removePrefix("https://$domain")
+			}
+			if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+				imageUrl = imageUrl
+			} else {
+				imageUrl = imageUrl.toAbsoluteUrl(domain)
+			}
+
 			MangaPage(
 				id = generateUid(imageUrl),
 				url = imageUrl,
