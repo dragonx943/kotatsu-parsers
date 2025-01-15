@@ -35,7 +35,7 @@ internal class KomikTapParser(context: MangaLoaderContext) :
 			.getJSONArray("images")
 
 		return List(imagesJsonArray.length()) { i ->
-			val imageUrl = imagesJsonArray.getString(i).toAbsoluteUrl(domain)
+			val imageUrl = imagesJsonArray.getString(i).toAbsoluteUrl(domain).removePrefix("https://$domain/")
 			MangaPage(
 				id = generateUid(imageUrl),
 				url = imageUrl,
