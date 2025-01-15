@@ -21,34 +21,56 @@ internal class KomikTapParser(context: MangaLoaderContext) :
 		val chapterUrl = chapter.url.toAbsoluteUrl(domain)
 		val docs = webClient.httpGet(chapterUrl).parseHtml()
 
-		val scriptContent = docs.select("script")
-			.firstOrNull { it.data().contains("ts_reader.run") }
-			?.data()
-			?: return emptyList()
-		val jsonPart = scriptContent.substringAfter("ts_reader.run(")
-			.substringBeforeLast(")")
-		val imagesJsonArray = JSONObject(jsonPart)
-			.getJSONArray("sources")
-			.getJSONObject(0)
-			.getJSONArray("images")
-
-		return List(imagesJsonArray.length()) { i ->
-			var imageUrl = imagesJsonArray.getString(i)
-			if (imageUrl.startsWith("https://komiktap.info/")) {
-				imageUrl = imageUrl.removePrefix("https://komiktap.info/")
+		val test = docs.select(selectTestScript)
+		if (test.isNullOrEmpty() and !encodedSrc) {
+			return docs.select(selectPage).map { img ->
+				val url = resolveConflictedUrl(img.requireSrc().toRelativeUrl(domain))
+				MangaPage(
+					id = generateUid(url),
+					url = url,
+					preview = null,
+					source = source,
+				)
 			}
-			if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-				imageUrl = imageUrl
+		} else {
+			val images = if (encodedSrc) {
+				val script = docs.select(selectScript)
+				var decode = ""
+				for (i in script) {
+					if (i.attr("src").startsWith("data:text/javascript;base64,")) {
+						decode = Base64.getDecoder().decode(i.attr("src").replace("data:text/javascript;base64,", ""))
+							.decodeToString()
+						if (decode.startsWith("ts_reader.run")) {
+							break
+						}
+					}
+				}
+				JSONObject(decode.substringAfter('(').substringBeforeLast(')'))
+					.getJSONArray("sources")
+					.getJSONObject(0)
+					.getJSONArray("images")
+
 			} else {
-				imageUrl = imageUrl.toAbsoluteUrl(domain)
+				val script = docs.selectFirstOrThrow(selectTestScript)
+				JSONObject(script.data().substringAfter('(').substringBeforeLast(')'))
+					.getJSONArray("sources")
+					.getJSONObject(0)
+					.getJSONArray("images")
 			}
 
-			MangaPage(
-				id = generateUid(imageUrl),
-				url = imageUrl,
-				preview = null,
-				source = source,
-			)
+			val pages = ArrayList<MangaPage>(images.length())
+			for (i in 0 until images.length()) {
+				val url = resolveConflictedUrl(images.getString(i))
+				pages.add(
+					MangaPage(
+						id = generateUid(url),
+						url = url,
+						preview = null,
+						source = source,
+					),
+				)
+			}
+			return pages
 		}
 	}
 }

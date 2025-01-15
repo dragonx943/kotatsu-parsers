@@ -395,4 +395,14 @@ internal abstract class MangaReaderParser(
 			Cookie.parse(baseUri().toHttpUrl(), it)
 		}
 	}.getOrNull()
+
+	public suspend fun resolveConflictedUrl(url: String): String {
+		val regex = Regex("https?://[^/]+/https?://")
+		return if (regex.containsMatchIn(url)) {
+			val index = url.indexOf("http", url.indexOf("http") + 1)
+			url.substring(index)
+		} else {
+			url
+		}
+	}
 }
