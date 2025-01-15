@@ -21,56 +21,27 @@ internal class KomikTapParser(context: MangaLoaderContext) :
 		val chapterUrl = chapter.url.toAbsoluteUrl(domain)
 		val docs = webClient.httpGet(chapterUrl).parseHtml()
 
-		val test = docs.select(selectTestScript)
-		if (test.isNullOrEmpty() and !encodedSrc) {
-			return docs.select(selectPage).map { img ->
-				val url = img.requireSrc().toRelativeUrl(domain)
-				MangaPage(
-					id = generateUid(url),
-					url = url,
-					preview = null,
-					source = source,
-				)
-			}
-		} else {
-			val images = if (encodedSrc) {
-				val script = docs.select(selectScript)
-				var decode = ""
-				for (i in script) {
-					if (i.attr("src").startsWith("data:text/javascript;base64,")) {
-						decode = Base64.getDecoder().decode(i.attr("src").replace("data:text/javascript;base64,", ""))
-							.decodeToString()
-						if (decode.startsWith("ts_reader.run")) {
-							break
-						}
-					}
-				}
-				JSONObject(decode.substringAfter('(').substringBeforeLast(')'))
-					.getJSONArray("sources")
-					.getJSONObject(0)
-					.getJSONArray("images")
+		val scriptContent = docs.select("script")
+			.firstOrNull { it.data().contains("ts_reader.run") }
+			?.data()
+			?: return emptyList()
 
-			} else {
-				val script = docs.selectFirstOrThrow(selectTestScript)
-				JSONObject(script.data().substringAfter('(').substringBeforeLast(')'))
-					.getJSONArray("sources")
-					.getJSONObject(0)
-					.getJSONArray("images")
-			}
+		val jsonPart = scriptContent.substringAfter("ts_reader.run(")
+			.substringBeforeLast(")")
 
-			val pages = ArrayList<MangaPage>(images.length())
-			for (i in 0 until images.length()) {
-				val url = images.getString(i)
-				pages.add(
-					MangaPage(
-						id = generateUid(url),
-						url = url,
-						preview = null,
-						source = source,
-					),
-				)
-			}
-			return pages
+		val imagesJsonArray = JSONObject(jsonPart)
+			.getJSONArray("sources")
+			.getJSONObject(0)
+			.getJSONArray("images")
+
+		return List(imagesJsonArray.length()) { i ->
+			val imageUrl = imagesJsonArray.getString(i).toAbsoluteUrl(domain)
+			MangaPage(
+				id = generateUid(imageUrl),
+				url = imageUrl,
+				preview = null,
+				source = source,
+			)
 		}
 	}
 }
