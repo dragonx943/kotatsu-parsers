@@ -179,9 +179,9 @@ internal class MangaPark(context: MangaLoaderContext) :
 		val nsfw = tags.any { t -> t.key == "hentai" || t.key == "adult" }
 		val dateFormat = SimpleDateFormat("dd/MM/yyyy", sourceLocale)
 		manga.copy(
-			altTitle = doc.selectFirst("div[q:key=tz_2]")?.text().orEmpty(),
-			author = doc.selectFirst("div[q:key=tz_4]")?.text().orEmpty(),
-			description = doc.selectFirst("react-island[q:key=0a_9]")?.html().orEmpty(),
+			altTitle = doc.selectFirst("div[q:key=tz_2]")?.textOrNull(),
+			author = doc.selectFirst("div[q:key=tz_4]")?.textOrNull(),
+			description = doc.selectFirst("react-island[q:key=0a_9]")?.html(),
 			state = when (doc.selectFirst("span[q:key=Yn_5]")?.text()?.lowercase()) {
 				"ongoing" -> MangaState.ONGOING
 				"completed" -> MangaState.FINISHED
@@ -190,7 +190,7 @@ internal class MangaPark(context: MangaLoaderContext) :
 				else -> null
 			},
 			tags = tags,
-			isNsfw = nsfw,
+			contentRating = if (nsfw) ContentRating.ADULT else ContentRating.SAFE,
 			chapters = doc.body().select("div.group.flex div.px-2").mapChapters(reversed = true) { i, div ->
 				val a = div.selectFirstOrThrow("a")
 				val href = a.attrAsRelativeUrl("href")

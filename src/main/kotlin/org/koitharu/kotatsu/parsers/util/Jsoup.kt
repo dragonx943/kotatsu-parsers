@@ -79,7 +79,7 @@ public fun Element.attrAsAbsoluteUrlOrNull(attributeKey: String): String? {
 	if (attr.isEmpty() || attr.startsWith("data:")) {
 		return null
 	}
-	return (baseUri().toHttpUrlOrNull()?.newBuilder(attr) ?: return null).toString()
+	return (baseUri().toHttpUrlOrNull()?.resolve(attr) ?: return null).toString()
 }
 
 /**
@@ -128,6 +128,8 @@ public fun Element.selectLastOrThrow(cssQuery: String): Element = parseNotNull(s
 }
 
 public fun Element.textOrNull(): String? = text().nullIfEmpty()
+
+public fun Elements.textOrNull(): String? = text().nullIfEmpty()
 
 public fun Element.ownTextOrNull(): String? = ownText().nullIfEmpty()
 

@@ -113,7 +113,7 @@ internal class BrMangas(context: MangaLoaderContext) : PagedMangaParser(context,
 		return doc.select(".genres_page a").mapToSet { a ->
 			MangaTag(
 				key = a.attr("href").removeSuffix('/').substringAfterLast('/'),
-				title = a.text(),
+				title = a.text().toTitleCase(sourceLocale),
 				source = source,
 			)
 		}
@@ -122,18 +122,20 @@ internal class BrMangas(context: MangaLoaderContext) : PagedMangaParser(context,
 	override suspend fun getDetails(manga: Manga): Manga {
 		val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
 		return manga.copy(
-			altTitle = null,
-			state = null,
 			tags = doc.select("div.serie-infos li:contains(Categorias:) a").mapToSet { a ->
 				MangaTag(
 					key = a.attr("href").removeSuffix('/').substringAfterLast('/'),
-					title = a.text(),
+					title = a.text().toTitleCase(sourceLocale),
 					source = source,
 				)
 			},
-			author = doc.select("div.serie-infos li:contains(Autor:)").text().replace("Autor:", ""),
-			description = doc.select(".serie-texto p").text(),
-			isNsfw = doc.select("div.serie-infos li:contains(Categorias:)").text().contains("Hentai"),
+			author = doc.select("div.serie-infos li:contains(Autor:)").text().replace("Autor:", "").nullIfEmpty(),
+			description = doc.select(".serie-texto p").html(),
+			contentRating = if (doc.select("div.serie-infos li:contains(Categorias:)").text().contains("Hentai")) {
+				ContentRating.ADULT
+			} else {
+				manga.contentRating
+			},
 			chapters = doc.select(".capitulos li a")
 				.mapChapters { i, a ->
 					val url = a.attrAsRelativeUrl("href")
