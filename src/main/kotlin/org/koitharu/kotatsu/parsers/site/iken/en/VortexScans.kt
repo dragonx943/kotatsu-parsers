@@ -8,5 +8,5 @@ import org.koitharu.kotatsu.parsers.site.iken.IkenParser
 @MangaSourceParser("VORTEXSCANS", "VortexScans", "en")
 internal class VortexScans(context: MangaLoaderContext) :
 	IkenParser(context, MangaParserSource.VORTEXSCANS, "vortexscans.org") {
-	override val selectPages = "main section img"
+	override val selectPages = "div.chapter-image-container img"
 }
