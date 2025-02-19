@@ -79,11 +79,12 @@ internal class HentaiVnBuzz(context: MangaLoaderContext) : PagedMangaParser(cont
 			}
 		}
 
+		val fullUrl = url.toAbsoluteUrl(domain)
 		if (!filter.query.isNullOrEmpty()) {
-			val doc = webClient.httpGet(url).parseHtml()
+			val doc = webClient.httpGet(fullUrl).parseHtml()
 			return parseSearchManga(doc)
 		} else {
-			val doc = webClient.httpGet(url).parseHtml()
+			val doc = webClient.httpGet(fullUrl).parseHtml()
 			return parseListManga(doc)
 		}
 	}
