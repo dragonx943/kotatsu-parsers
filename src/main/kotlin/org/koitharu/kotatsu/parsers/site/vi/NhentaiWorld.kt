@@ -143,7 +143,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) : LegacyPagedMangaParse
             }
         }
 
-        val chapterData = doc.toString().run { // Ask ChatGPT
+        val chapterData = doc.toString().run {
             val dataPattern = "\"data\":\\[(.*?)\\]".toRegex()
             val enPattern = "\"chapterListEn\":\\[(.*?)\\]".toRegex()
             
