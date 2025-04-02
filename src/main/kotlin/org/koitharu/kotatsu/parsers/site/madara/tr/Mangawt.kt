@@ -7,6 +7,7 @@ import org.koitharu.kotatsu.parsers.site.madara.MadaraParser
 
 @MangaSourceParser("MANGAWT", "MangaWt.com", "tr")
 internal class Mangawt(context: MangaLoaderContext) :
-	MadaraParser(context, MangaParserSource.MANGAWT, "mangawt.com")
-
+	MadaraParser(context, MangaParserSource.MANGAWT, "mangawt.com") {
 	override val postReq = true
+}
+	
