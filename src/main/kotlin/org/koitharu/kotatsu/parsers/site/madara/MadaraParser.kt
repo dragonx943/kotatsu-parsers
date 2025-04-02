@@ -627,10 +627,6 @@ internal abstract class MadaraParser(
 		}
 		val dateFormat = SimpleDateFormat(datePattern, sourceLocale)
 
-		if (doc.select(selectChapter).isEmpty()) {
-			throw Exception(doc.toString()) // for debug
-		}
-
 		return doc.select(selectChapter).mapChapters(reversed = true) { i, li ->
 			val a = li.selectFirstOrThrow("a")
 			val href = a.attrAsRelativeUrl("href")
