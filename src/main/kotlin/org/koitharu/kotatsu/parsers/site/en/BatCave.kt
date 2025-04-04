@@ -13,7 +13,7 @@ import java.util.*
 
 @MangaSourceParser("BATCAVE", "BatCave", "en")
 internal class BatCave(context: MangaLoaderContext) :
-	LegacyPagedMangaParser(context, MangaParserSource.BATCAVE, 10) {
+	LegacyPagedMangaParser(context, MangaParserSource.BATCAVE, 20) {
 
     override val configKeyDomain = ConfigKey.Domain("batcave.biz")
 
@@ -64,10 +64,70 @@ internal class BatCave(context: MangaLoaderContext) :
 
         val fullUrl = urlBuilder.toString().toAbsoluteUrl(domain)
         val doc = webClient.httpGet(fullUrl).parseHtml()
-        return when {
-            !filter.query.isNullOrEmpty() -> parseSearchManga(doc)
-            else -> parseListManga(doc)
+        return doc.select("div.readed.d-flex.short").map { item ->
+			val a = item.selectFirst("a.readed__img.img-fit-cover.anim")
+            val img = a?.selectFirst("img.lazy-loaded")
+            val url = a?.attr("href") ?: ""
+			Manga(
+				id = generateUid(url),
+				url = url,
+				publicUrl = url,
+				title = a?.attr("title").orEmpty(),
+				altTitles = emptySet(),
+				authors = emptySet(),
+				description = null,
+				tags = emptySet(),
+				rating = RATING_UNKNOWN,
+				state = null,
+				coverUrl = img?.attrAsAbsoluteUrlOrNull("data-src"),
+				contentRating = if (isNsfwSource) ContentRating.ADULT else null,
+				source = source,
+			)
         }
     }
+
+    override suspend fun getDetails(manga: Manga): Manga {
+		val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
+		val tags = doc.select("div.hentai-info .line-content a.item-tag")
+			.mapToSet { a ->
+				MangaTag(
+					title = a.text().toTitleCase(sourceLocale),
+					key = a.attr("href").substringAfterLast('/'),
+					source = source,
+				)
+			}
+
+		val chapters = doc.select("ul#chapter-list li.citem").mapChapters(reversed = true) { i, li ->
+			val a = li.selectFirst("a") ?: return@mapChapters null
+			MangaChapter(
+				id = generateUid(a.attr("href")),
+				title = a.text(),
+				number = i + 1f,
+				url = a.attrAsRelativeUrl("href"),
+				uploadDate = parseChapterDate(li.selectFirst(".time")?.text()),
+				source = source,
+				scanlator = null,
+				branch = null,
+				volume = 0,
+			)
+		}
+
+		val altTitle = doc.selectFirst("h2.alternative")?.textOrNull()
+		val author = doc.selectFirst("div.hentai-info .line:contains(Tác giả) .line-content")?.textOrNull()
+		val state = when (doc.selectFirst("div.hentai-info .line:contains(Tình trạng) .line-content")?.text()) {
+			"Đang cập nhật" -> MangaState.ONGOING
+			"Hoàn thành" -> MangaState.FINISHED
+			else -> null
+		}
+
+		return manga.copy(
+			tags = tags,
+			authors = setOfNotNull(author),
+			altTitles = setOfNotNull(altTitle),
+			state = state,
+			chapters = chapters,
+			description = doc.select("div.about").text(),
+		)
+	}
 
 }
