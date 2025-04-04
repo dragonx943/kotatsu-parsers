@@ -12,4 +12,5 @@ internal class HentaiVnPlus(context: MangaLoaderContext) :
 	override val listUrl = "truyen-hentai/"
 	override val tagPrefix = "the-loai/"
 	override val datePattern = "dd/MM/yyyy"
+	override val selectPage = "div.reading-content"
 }

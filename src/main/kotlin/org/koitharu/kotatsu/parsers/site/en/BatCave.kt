@@ -6,6 +6,7 @@ import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
+import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import java.text.SimpleDateFormat
@@ -88,23 +89,18 @@ internal class BatCave(context: MangaLoaderContext) :
 
     override suspend fun getDetails(manga: Manga): Manga {
 		val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
-		val tags = doc.select("div.hentai-info .line-content a.item-tag")
-			.mapToSet { a ->
-				MangaTag(
-					title = a.text().toTitleCase(sourceLocale),
-					key = a.attr("href").substringAfterLast('/'),
-					source = source,
-				)
-			}
-
-		val chapters = doc.select("ul#chapter-list li.citem").mapChapters(reversed = true) { i, li ->
-			val a = li.selectFirst("a") ?: return@mapChapters null
+		
+		val dateFormat = SimpleDateFormat("d.MM.yyyy", Locale.US)
+		val chapters = doc.select("div.comix__fullstory-chapters .cl__item").mapChapters(reversed = true) { i, item ->
+			val titleElement = item.selectFirst(".cl__item-title a") ?: return@mapChapters null
+			val dateStr = item.selectFirst(".cl__item-date")?.text()
+			
 			MangaChapter(
-				id = generateUid(a.attr("href")),
-				title = a.text(),
+				id = generateUid(titleElement.attr("href")),
+				title = titleElement.text(),
 				number = i + 1f,
-				url = a.attrAsRelativeUrl("href"),
-				uploadDate = parseChapterDate(li.selectFirst(".time")?.text()),
+				url = titleElement.attrAsRelativeUrl("href"),
+				uploadDate = dateStr?.let { runCatching { dateFormat.parse(it)?.time }.getOrNull() } ?: 0L,
 				source = source,
 				scanlator = null,
 				branch = null,
@@ -112,22 +108,39 @@ internal class BatCave(context: MangaLoaderContext) :
 			)
 		}
 
-		val altTitle = doc.selectFirst("h2.alternative")?.textOrNull()
-		val author = doc.selectFirst("div.hentai-info .line:contains(Tác giả) .line-content")?.textOrNull()
-		val state = when (doc.selectFirst("div.hentai-info .line:contains(Tình trạng) .line-content")?.text()) {
-			"Đang cập nhật" -> MangaState.ONGOING
-			"Hoàn thành" -> MangaState.FINISHED
-			else -> null
+		val author = doc.selectFirst("li:contains(Publisher:)")?.text()?.substringAfter("Publisher:")?.trim()
+		val state = when (doc.selectFirst("li:contains(Release type:)")?.text()?.substringAfter("Release type:")?.trim()) {
+			"Ongoing" -> MangaState.ONGOING
+			else -> MangaState.FINISHED
 		}
 
 		return manga.copy(
-			tags = tags,
 			authors = setOfNotNull(author),
-			altTitles = setOfNotNull(altTitle),
 			state = state,
 			chapters = chapters,
-			description = doc.select("div.about").text(),
+			description = doc.select("div.page__text.full-text.clearfix").text()
 		)
 	}
 
+	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
+		val doc = webClient.httpGet(chapter.url.toAbsoluteUrl(domain)).parseHtml()
+		val data = doc.selectFirst("script:containsData(__DATA__)")?.data()
+			?.substringAfter("=")
+			?.trim()
+			?.removeSuffix(";")
+			?.substringAfter("\"images\":[")
+			?.substringBefore("]")
+			?.split(",")
+			?.map { it.trim().removeSurrounding("\"").replace("\\", "") }
+			?: throw ParseException("Image data not found", chapter.url)
+
+		return data.map { imageUrl ->
+			MangaPage(
+				id = generateUid(imageUrl),
+				url = imageUrl,
+				preview = null,
+				source = source
+			)
+		}
+	}
 }
