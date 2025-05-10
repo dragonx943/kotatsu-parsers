@@ -7,7 +7,9 @@ import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import java.util.*
+import org.koitharu.kotatsu.parsers.Broken
 
+@Broken("TODO: Improve getListPage, getDetails; Add tags, filters,...")
 @MangaSourceParser("MULTPORN", "Multporn")
 internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(context, MangaParserSource.MULTPORN, 42) {
 
@@ -30,19 +32,10 @@ internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(co
     override val filterCapabilities: MangaListFilterCapabilities
         get() = MangaListFilterCapabilities(
             isMultipleTagsSupported = true,
-            isTagsExclusionSupported = false,
             isSearchSupported = true,
         )
 
-    override suspend fun getFilterOptions() = MangaListFilterOptions(
-        availableTags = fetchAvailableTags(),
-        availableStates = EnumSet.of(MangaState.ONGOING, MangaState.FINISHED),
-        availableContentTypes = EnumSet.of(
-            ContentType.MANGA,
-            ContentType.COMICS,
-            ContentType.HENTAI
-        ),
-    )
+    override suspend fun getFilterOptions() = MangaListFilterOptions()
 
     override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
         val url = buildString {
@@ -69,6 +62,7 @@ internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(co
         val doc = webClient.httpGet(url).parseHtml()
         return doc.select(".masonry-item").map { div ->
             val href = div.selectFirstOrThrow(".views-field-title a").attrAsRelativeUrl("href")
+            val coverUrl = div.selectFirst(".views-field.views-field-field-preview img")?.attrAsAbsoluteUrlOrNull("src")
             Manga(
                 id = generateUid(href),
                 title = div.select(".views-field-title").text(),
@@ -77,7 +71,7 @@ internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(co
                 publicUrl = href.toAbsoluteUrl(domain),
                 rating = RATING_UNKNOWN,
                 contentRating = ContentRating.ADULT,
-                coverUrl = div.selectFirst("img")?.attrAsAbsoluteUrlOrNull("src"),
+                coverUrl = coverUrl,
                 tags = emptySet(),
                 state = null,
                 authors = emptySet(),
@@ -88,7 +82,6 @@ internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(co
 
     override suspend fun getDetails(manga: Manga): Manga {
         val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
-        
         val authors = (doc.select(".field:has(.field-label:contains(Author:)) .links a").map { it.text().trim() } +
                 parseUnlabelledAuthorNames(doc)).distinct()
 
@@ -148,10 +141,6 @@ internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(co
                 source = source,
             )
         }
-    }
-
-    private suspend fun fetchAvailableTags(): Set<MangaTag> {
-        return emptySet()
     }
 
     private fun parseUnlabelledAuthorNames(document: org.jsoup.nodes.Document): List<String> {
