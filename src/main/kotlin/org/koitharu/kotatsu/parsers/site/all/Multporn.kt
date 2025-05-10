@@ -13,6 +13,15 @@ internal class Multporn(context: MangaLoaderContext) : LegacyPagedMangaParser(co
 
     override val configKeyDomain = ConfigKey.Domain("multporn.net")
 
+    override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
+		super.onCreateConfig(keys)
+		keys.add(userAgentKey)
+	}
+
+    override fun getRequestHeaders() = super.getRequestHeaders().newBuilder()
+		.add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+		.build()
+
     override val availableSortOrders: Set<SortOrder> = EnumSet.of(
         SortOrder.UPDATED,
         SortOrder.POPULARITY,
