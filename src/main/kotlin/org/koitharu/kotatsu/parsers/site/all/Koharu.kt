@@ -406,7 +406,32 @@ internal class Koharu(context: MangaLoaderContext) :
 	private suspend fun fetchAuthorsIds(): Map<String, String> = fetchTags(namespace = 1)
 		.associate { it.title.lowercase() to it.key }
 
-	private suspend fun getClearance(mangaId: String): String = WebViewHelper(context)
-		.getLocalStorageValue(domain, "clearance")?.removeSurrounding('"')?.nullIfEmpty()
-		?: context.requestBrowserAction(this, "https://$domain/g/$mangaId/read/1")
+	private suspend fun getClearance(mangaId: String): String {
+	    var clearance = WebViewHelper(context)
+	        .getLocalStorageValue(domain, "clearance")
+	        ?.removeSurrounding('"')
+	        ?.nullIfEmpty()
+
+	    if (clearance.isNullOrEmpty() || !isClearanceValid(clearance)) {    
+	        clearance = context.requestBrowserAction(
+	            parser = this,
+	            url = "https://$domain/g/$mangaId/read/1",
+	        )
+
+	        clearance = WebViewHelper(context)
+	            .getLocalStorageValue(domain, "clearance")
+	            ?.removeSurrounding('"')
+	            ?.nullIfEmpty()
+	    }
+
+	    return clearance ?: throw Exception("Can't get clearance token")
+	}
+
+	private suspend fun isClearanceValid(clearance: String): Boolean {
+		return try {
+			clearance.isNotBlank()
+		} catch (e: Exception) {
+			false
+		}
+	}
 }
