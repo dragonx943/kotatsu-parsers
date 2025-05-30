@@ -68,17 +68,14 @@ internal class SnowMTL(context: MangaLoaderContext):
             }
         }
 
-        return webClient.httpGet(url)
-            .parseHtml()
+        return webClient.httpGet(url).parseHtml()
             .select("div.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-3.xl\\:grid-cols-4.gap-8.p-6 > div")
             .map { div ->
-                val href = div.selectFirst("a")?.attrAsRelativeUrl("href")
-                    ?: throw ParseException("Link not found", div.baseUri())
-
+                val href = div.selectFirst("a")?.attr("href") ?: throw ParseException("Link not found", div.baseUri())
                 Manga(
                     id = generateUid(href),
                     url = href,
-                    publicUrl = href.toAbsoluteUrl(div.baseUri()),
+                    publicUrl = href.toAbsoluteUrl(domain),
                     coverUrl = div.selectFirst("a > div > img")?.src().orEmpty(),
                     title = div.selectFirst("div > a > h3")?.text().orEmpty(),
                     altTitles = emptySet(),
@@ -113,14 +110,6 @@ internal class SnowMTL(context: MangaLoaderContext):
             true -> MangaState.ONGOING
             false -> MangaState.FINISHED
         }
-        
-        val genres = doc.select("p:contains(Genres:) + div span").mapToSet { 
-            MangaTag(
-                title = it.text(),
-                key = "",
-                source = source,
-            )
-        }
 
         val chaptersRoot = doc.selectFirst("section.bg-gray-800.rounded-lg.shadow-md.mt-8.p-6") 
             ?: throw ParseException("Chapters not found", manga.url)
@@ -151,9 +140,8 @@ internal class SnowMTL(context: MangaLoaderContext):
             description = description,
             authors = setOfNotNull(authors),
             state = state,
-            tags = genres,
             altTitles = altTitles,
-            chapters = chapters
+            chapters = chapters.reversed()
         )
     }
 
@@ -168,7 +156,7 @@ internal class SnowMTL(context: MangaLoaderContext):
             ?: throw ParseException("JSON data not found", chapter.url)
             
         val jsonArray = JSONArray(jsonString)
-        return jsonArray.mapNotNull { item ->
+        return jsonArray.toList().mapNotNull { item ->
             val imgUrl = "https://" + (item as? JSONObject)?.optString("img_url")
             MangaPage(
                 id = generateUid(imgUrl),
