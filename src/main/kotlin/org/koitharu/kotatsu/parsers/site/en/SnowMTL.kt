@@ -68,30 +68,28 @@ internal class SnowMTL(context: MangaLoaderContext):
             }
         }
 
-        return webClient.httpGet(url).parseHtml()
-            .select("div.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-3.xl\\:grid-cols-4.gap-8.p-6 > div")
-            .map { div ->
-                val href = div.selectFirst("a")?.attr("href") ?: throw ParseException("Link not found", div.baseUri())
-                Manga(
-                    id = generateUid(href),
-                    url = href,
-                    publicUrl = href.toAbsoluteUrl(domain),
-                    coverUrl = div.selectFirst("a > div > img")?.src().orEmpty(),
-                    title = div.selectFirst("div > a > h3")?.text().orEmpty(),
-                    altTitles = emptySet(),
-                    rating = RATING_UNKNOWN,
-                    tags = emptySet(),
-                    authors = emptySet(),
-                    state = null,
-                    source = source,
-                    contentRating = null,
-                )
-            }
+        val doc = webClient.httpGet(url).parseHtml()
+        return doc.select("div.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-3.xl\\:grid-cols-4.gap-8.p-6 > div").map { div ->
+            val href = div.selectFirst("a")?.attr("href") ?: throw ParseException("Link not found", url)
+            Manga(
+                id = generateUid(href),
+                url = href,
+                publicUrl = href.toAbsoluteUrl(domain),
+                coverUrl = div.selectFirst("a > div > img")?.src().orEmpty(),
+                title = div.selectFirst("div > a > h3")?.text().orEmpty(),
+                altTitles = emptySet(),
+                rating = RATING_UNKNOWN,
+                tags = emptySet(),
+                authors = emptySet(),
+                state = null,
+                source = source,
+                contentRating = null,
+            )
+        }
     }
 
     override suspend fun getDetails(manga: Manga): Manga {
         val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
-
         val altTitles = doc.select("p:contains(Alternative Title)").firstOrNull()?.text()
             ?.substringAfter("Alternative Title:")
             ?.removeSurrounding("[", "]")
@@ -147,20 +145,21 @@ internal class SnowMTL(context: MangaLoaderContext):
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val doc = webClient.httpGet(chapter.url.toAbsoluteUrl(domain)).parseHtml()
-        
-        val jsonString = doc.selectFirst("div#json-data")
-            ?.html()
-            ?.substringAfter(">")
-            ?.substringBeforeLast("<")
+        val jsonData = doc.selectFirst("div#json-data")
+            ?.text()
             ?.trim(' ', '\n', '\t', '\r')
             ?: throw ParseException("JSON data not found", chapter.url)
             
-        val jsonArray = JSONArray(jsonString)
-        return jsonArray.toList().mapNotNull { item ->
-            val imgUrl = "https://" + (item as? JSONObject)?.optString("img_url")
+        val jsonArray = JSONArray(jsonData)
+        val imgUrls = jsonArray.toList().mapNotNull { item ->
+            (item as? JSONObject)?.optString("img_url")
+        }
+        
+        return imgUrls.map { imgUrl ->
+            val fullUrl = "https://$imgUrl"
             MangaPage(
-                id = generateUid(imgUrl),
-                url = imgUrl,
+                id = generateUid(fullUrl),
+                url = fullUrl,
                 preview = null,
                 source = source,
             )
