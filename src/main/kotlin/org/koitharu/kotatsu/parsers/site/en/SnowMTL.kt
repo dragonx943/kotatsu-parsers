@@ -145,15 +145,12 @@ internal class SnowMTL(context: MangaLoaderContext):
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
         val doc = webClient.httpGet(chapter.url.toAbsoluteUrl(domain)).parseHtml()
-        val jsonData = doc.selectFirst("div#json-data")
-            ?.text()
-            ?.trim(' ', '\n', '\t', '\r')
+        val jsonText = doc.selectFirst("div#json-data")?.text()
             ?: throw ParseException("JSON data not found", chapter.url)
-            
-        val jsonArray = JSONArray(jsonData)
-        val imgUrls = jsonArray.toList().mapNotNull { item ->
-            (item as? JSONObject)?.optString("img_url")
-        }
+        
+        val imgUrls = Regex(""""img_url":\s*"([^"]+)"""").findAll(jsonText)
+            .map { it.groupValues[1] }
+            .toList()
         
         return imgUrls.map { imgUrl ->
             val fullUrl = "https://$imgUrl"
