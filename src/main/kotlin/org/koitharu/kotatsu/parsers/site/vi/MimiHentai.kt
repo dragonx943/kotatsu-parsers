@@ -125,8 +125,18 @@ internal class MimiHentai(context: MangaLoaderContext) :
 		return data.mapJSON { jo ->
 			val id = jo.getLong("id")
 			val title = jo.getString("title").takeIf { it.isNotEmpty() } ?: "Web chưa đặt tên"
-                        val differentNames = jo.optJSONArray("differentNames")?.mapJSON { it as String }?.toSet() ?: emptySet()
 			val description = jo.getStringOrNull("description")
+
+                        val differentNames = mutableSetOf<String>().apply {
+                                jo.optJSONArray("differentNames")?.let { namesArray ->
+                                        for (i in 0 until namesArray.length()) {
+                                                namesArray.optString(i)?.takeIf { it.isNotEmpty() }?.let { name ->
+                                                        add(name)
+                                                }
+                                        }
+                                }
+                        }
+
                         val state = when (description) {
 				"Đang Tiến Hành" -> MangaState.ONGOING
 				"Hoàn Thành" -> MangaState.FINISHED
