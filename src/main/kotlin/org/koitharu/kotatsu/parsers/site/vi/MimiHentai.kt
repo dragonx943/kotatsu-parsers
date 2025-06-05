@@ -103,14 +103,14 @@ internal class MimiHentai(context: MangaLoaderContext) :
                         else {
                                 append(
                                         when (order) {
-                                        SortOrder.UPDATED -> "/tatcatruyen?page=$page&sort=updated_at"
-                                        SortOrder.ALPHABETICAL -> "/tatcatruyen?page=$page&sort=title"
-                                        SortOrder.POPULARITY -> "/tatcatruyen?page=$page&sort=views"
-                                        SortOrder.POPULARITY_TODAY -> "/top-manga?page=$page&timeType=1&limit=18"
-                                        SortOrder.POPULARITY_WEEK -> "/top-manga?page=$page&timeType=2&limit=18"
-                                        SortOrder.POPULARITY_MONTH -> "/top-manga?page=$page&timeType=3&limit=18"
-                                        SortOrder.RATING -> "/tatcatruyen?page=$page&sort=likes"
-                                        else -> "/tatcatruyen?page=$page&sort=updated_at" // default
+                                                SortOrder.UPDATED -> "/tatcatruyen?page=$page&sort=updated_at"
+                                                SortOrder.ALPHABETICAL -> "/tatcatruyen?page=$page&sort=title"
+                                                SortOrder.POPULARITY -> "/tatcatruyen?page=$page&sort=views"
+                                                SortOrder.POPULARITY_TODAY -> "/top-manga?page=$page&timeType=1&limit=18"
+                                                SortOrder.POPULARITY_WEEK -> "/top-manga?page=$page&timeType=2&limit=18"
+                                                SortOrder.POPULARITY_MONTH -> "/top-manga?page=$page&timeType=3&limit=18"
+                                                SortOrder.RATING -> "/tatcatruyen?page=$page&sort=likes"
+                                                else -> "/tatcatruyen?page=$page&sort=updated_at" // default
                                         }
                                 )
                         }
