@@ -175,9 +175,11 @@ internal class MimiHentai(context: MangaLoaderContext) :
 	override suspend fun getDetails(manga: Manga): Manga {
 		val url = manga.url.toAbsoluteUrl(domain)
 		val json = webClient.httpGet(url).parseJson()
+                val id = json.getLong("id")
+		val description = json.getStringOrNull("description")
+		val uploaderName = json.getJSONObject("uploader").getString("displayName")
 
-		val relationInfo = json.getJSONObject("relationInfo")
-		val tags = relationInfo.getJSONArray("genres").mapJSONToSet { jo ->
+		val tags = json.getJSONArray("genres").mapJSONToSet { jo ->
 			MangaTag(
 				title = jo.getString("name").toTitleCase(sourceLocale),
 				key = jo.getLong("id").toString(),
@@ -185,10 +187,6 @@ internal class MimiHentai(context: MangaLoaderContext) :
 			)
 		}
 
-		val basicInfo = json.getJSONObject("basicInfo")
-		val id = basicInfo.getLong("id")
-		val description = basicInfo.getStringOrNull("description")
-		val uploaderName = json.getStringOrNull("uploaderName")
 		val urlChaps = "https://$domain/$apiSuffix/gallery/$id"
 		val parsedChapters = webClient.httpGet(urlChaps).parseJsonArray()
 		val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US)
