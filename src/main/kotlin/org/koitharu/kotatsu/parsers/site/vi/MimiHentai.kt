@@ -10,9 +10,7 @@ import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
 import java.text.SimpleDateFormat
 import java.util.*
-import org.koitharu.kotatsu.parsers.Broken
 
-@Broken("Changed API entities + paths")
 @MangaSourceParser("MIMIHENTAI", "MimiHentai", "vi", type = ContentType.HENTAI)
 internal class MimiHentai(context: MangaLoaderContext) :
 	LegacyPagedMangaParser(context, MangaParserSource.MIMIHENTAI, 18) {
