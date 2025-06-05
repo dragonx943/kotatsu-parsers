@@ -124,7 +124,7 @@ internal class MimiHentai(context: MangaLoaderContext) :
 	private fun parseMangaList(data: JSONArray): List<Manga> {
 		return data.mapJSON { jo ->
 			val id = jo.getLong("id")
-			val title = jo.getString("title")
+			val title = jo.getString("title").takeIf { it.isNotEmpty() } ?: "Chưa đặt tên"
 			val description = jo.getStringOrNull("description")
 			val authors = jo.getJSONArray("authors").asTypedList<String>().toSet()
 			val differentNames = jo.getJSONArray("differentNames").asTypedList<String>().toSet()
@@ -133,6 +133,13 @@ internal class MimiHentai(context: MangaLoaderContext) :
 				"Hoàn Thành" -> MangaState.FINISHED
 				else -> null
 			}
+			val tags = jo.getJSONArray("genres").mapJSON { genre ->
+				MangaTag(
+					key = genre.getLong("id").toString(),
+					title = genre.getString("name"),
+					source = source
+				)
+			}.toSet()
 
 			Manga(
 				id = generateUid(id),
@@ -143,7 +150,7 @@ internal class MimiHentai(context: MangaLoaderContext) :
 				rating = RATING_UNKNOWN,
 				contentRating = ContentRating.ADULT,
 				coverUrl = jo.getString("coverUrl"),
-				tags = emptySet(),
+				tags = tags,
 				state = state,
 				authors = authors,
 				source = source,
