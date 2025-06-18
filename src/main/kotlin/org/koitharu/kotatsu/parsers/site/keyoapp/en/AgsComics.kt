@@ -13,7 +13,7 @@ internal class AgsComics(context: MangaLoaderContext) :
 	KeyoappParser(context, MangaParserSource.AGSCOMICS, "agrcomics.com") {
 
 	override val cover: (Element) -> String? = { div ->
-		div.selectFirst("div.bg-cover, div.bg-center.bg-cover")
+		div.selectFirst("div.absolute.top-0.left-0.h-full.w-full.bg-center.bg-cover")
 			?.styleValueOrNull("background-image")
 			?.cssUrl()
 	}

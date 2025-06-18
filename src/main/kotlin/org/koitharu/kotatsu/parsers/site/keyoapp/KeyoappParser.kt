@@ -125,12 +125,12 @@ internal abstract class KeyoappParser(
 
 	private fun addManga(div: Element): Manga {
 		val href = div.selectFirstOrThrow("a").attrAsRelativeUrl("href")
-		val cover = cover(div)
+		val coverUrl = cover(div)
 		return Manga(
 			id = generateUid(href),
 			url = href,
 			publicUrl = href.toAbsoluteUrl(div.host ?: domain),
-			coverUrl = cover,
+			coverUrl = coverUrl,
 			title = (div.selectFirst("h3")?.text() ?: div.selectFirst("a")?.attr("title")).orEmpty(),
 			altTitles = emptySet(),
 			rating = RATING_UNKNOWN,
