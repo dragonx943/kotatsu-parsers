@@ -13,13 +13,12 @@ internal class AgsComics(context: MangaLoaderContext) :
 	KeyoappParser(context, MangaParserSource.AGSCOMICS, "agrcomics.com") {
 
 	override val cover: (Element) -> String? = { div ->
-		val eL = div.selectFirst("div.absolute.top-0.left-0.h-full.w-full.bg-center.bg-cover")
-			?: throw Exception("No element found")
+		val coverDiv = div.selectFirst("div.bg-cover[style*=background-image]")
+			?: div.takeIf { it.hasClass("bg-cover") && it.hasAttr("style") }
+			?: div.selectFirst("[style*=background-image]")
+			?: throw Exception("Element or image url not found")
 
-		val coverUrl = eL?.styleValueOrNull("background-image")?.cssUrl()
-			?: throw Exception("No url found")
-			
-		coverUrl
+		coverDiv.styleValueOrNull("background-image")?.cssUrl()
 	}
 
 }
