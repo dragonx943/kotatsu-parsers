@@ -4,6 +4,12 @@ import androidx.collection.arraySetOf
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Interceptor
+import okhttp3.Response
+import okio.IOException
+import org.json.JSONArray
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.network.UserAgents
@@ -13,6 +19,8 @@ import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
 import org.json.JSONObject
+import org.koitharu.kotatsu.parsers.bitmap.Bitmap
+import org.koitharu.kotatsu.parsers.bitmap.Rect
 import java.util.*
 
 internal abstract class YuriGardenParser(
@@ -193,19 +201,104 @@ internal abstract class YuriGardenParser(
 	}
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
-            val json = webClient.httpGet("https://$apiSuffix/chapters/${chapter.url}").parseJson()
-            val pages = json.getJSONArray("pages").asTypedList<JSONObject>()
+		val json = webClient.httpGet("https://$apiSuffix/chapters/${chapter.url}").parseJson()
+		val pages = json.getJSONArray("pages").asTypedList<JSONObject>()
 
-            return pages.mapIndexed { index, page ->
-                val pageUrl = page.getString("url")
-                MangaPage(
-                    id = generateUid(index.toLong()),
-                    url = pageUrl,
-                    preview = null,
-                    source = source,
-                )
-            }
-        }
+		return pages.mapIndexed { index, page ->
+			val rawUrl = page.getString("url")
+
+			if (rawUrl.startsWith("comics")) {
+				val key = page.optString("key", null)
+
+				val url = "https://$domain/$rawUrl".toHttpUrl().newBuilder().apply {
+					if (!key.isNullOrEmpty()) {
+						fragment("${YG_KEY}k=$key&pc=10")
+					}
+				}.build().toString()
+
+				MangaPage(
+					id = generateUid(index.toLong()),
+					url = url,
+					preview = null,
+					source = source,
+				)
+			} else {
+				val url = rawUrl.toHttpUrlOrNull()?.toString() ?: rawUrl
+				MangaPage(
+					id = generateUid(index.toLong()),
+					url = url,
+					preview = null,
+					source = source,
+				)
+			}
+		}
+	}
+
+	override fun intercept(chain: Interceptor.Chain): Response {
+		val response = chain.proceed(chain.request())
+		val fragment = response.request.url.fragment ?: return response
+		if (!fragment.startsWith(YG_KEY)) return response
+
+		return context.redrawImageResponse(response) { bitmap ->
+			val drm = fragment.substringAfter(YG_KEY) // k=xxx&pc=10
+			val params = drm.split('&').associate {
+				val (k, v) = it.split('=', limit = 2).let { p -> p[0] to (p.getOrNull(1) ?: "") }
+				k to v
+			}
+			val key = params["k"] ?: throw IOException("Error: Missing key from API")
+			val pc = 10
+			kotlinx.coroutines.runBlocking {
+				unscrambleYuriGarden(bitmap, key, pc)
+			}
+		}
+	}
+
+	private suspend fun unscrambleYuriGarden(bitmap: Bitmap, key: String, partCount: Int): Bitmap {
+		val js = """
+    (function(K,H,PC){
+      const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz",F=[1,1,2,6,24,120,720,5040,40320,362880,3628800];
+      function I(e,p){const n=Array.from({length:p},(_,i)=>i),r=[];for(let a=p-1;a>=0;a--){const i=F[a],s=Math.floor(e/i);e%=i;r.push(n.splice(s,1)[0])}return r}
+      function S(e){let t=0;for(const n of e){const r=A.indexOf(n);if(r<0)throw new Error("Invalid Base58 char");t=t*58+r}return t}
+      function U(e,p){if(!/^H[1-9A-HJ-NP-Za-km-z]+$/.test(e))throw new Error("Invalid Base58 char");const t=e.slice(1,-1),n=e.slice(-1),r=S(t);if(A[r%58]!==n)throw new Error("Base58 checksum mismatch");return I(r,p)}
+      function P(h,p){const n=Math.floor(h/p),r=h%p,a=[];for(let i=0;i<p;i++)a.push(n+(i<r?1:0));return a}
+      function D(e){const t=Array(e.length).fill(0);for(let n=0;n<e.length;n++)t[e[n]]=n;return t}
+      function X(k,h,p){const e=U(k.slice(4),p),s=D(e),u=P(h-4*(p-1),p),m=e.map(i=>u[i]);let pts=[0];for(let i=0;i<m.length;i++)pts[i+1]=pts[i]+m[i];let f=[];for(let i=0;i<m.length;i++)f.push({y:i==0?0:pts[i]+4*i,h:m[i]});return s.map(i=>f[i])}
+      return JSON.stringify(X(K,H,PC));
+    })(${escapeForJsString(key)}, ${bitmap.height}, $partCount);
+    """.trimIndent()
+
+		val result = context.evaluateJs(js) ?: throw IOException("JS evaluation failed")
+		val arr = JSONArray(result)
+
+		val out = context.createBitmap(bitmap.width, bitmap.height)
+		var dy = 0
+		for (i in 0 until arr.length()) {
+			val o = arr.getJSONObject(i)
+			val sy = o.getInt("y")
+			val h = o.getInt("h")
+			val src = Rect(0, sy, bitmap.width, sy + h)
+			val dst = Rect(0, dy, bitmap.width, dy + h)
+			out.drawBitmap(bitmap, src, dst)
+			dy += h
+		}
+		return out
+	}
+
+	private fun escapeForJsString(s: String): String =
+		buildString {
+			append('"')
+			for (c in s) {
+				when (c) {
+					'\\' -> append("\\\\")
+					'"' -> append("\\\"")
+					'\n' -> append("\\n")
+					'\r' -> append("\\r")
+					'\t' -> append("\\t")
+					else -> append(c)
+				}
+			}
+			append('"')
+		}
 
 	private suspend fun fetchTags(): Set<MangaTag> {
 		val json = webClient.httpGet("https://$apiSuffix/resources/systems_vi.json").parseJson()
@@ -218,5 +311,9 @@ internal abstract class YuriGardenParser(
 				source = source,
 			)
 		}
+	}
+
+	private companion object {
+		const val YG_KEY = "yg_key="
 	}
 }
