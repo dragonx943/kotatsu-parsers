@@ -212,7 +212,7 @@ internal abstract class YuriGardenParser(
 
 				val url = "https://$domain/$rawUrl".toHttpUrl().newBuilder().apply {
 					if (!key.isNullOrEmpty()) {
-						fragment("${YG_KEY}k=$key&pc=10")
+						fragment("yg_key=$key")
 					}
 				}.build().toString()
 
@@ -237,18 +237,12 @@ internal abstract class YuriGardenParser(
 	override fun intercept(chain: Interceptor.Chain): Response {
 		val response = chain.proceed(chain.request())
 		val fragment = response.request.url.fragment ?: return response
-		if (!fragment.startsWith(YG_KEY)) return response
+		if (!fragment.startsWith("yg_key=")) return response
 
 		return context.redrawImageResponse(response) { bitmap ->
-			val drm = fragment.substringAfter(YG_KEY) // k=xxx&pc=10
-			val params = drm.split('&').associate {
-				val (k, v) = it.split('=', limit = 2).let { p -> p[0] to (p.getOrNull(1) ?: "") }
-				k to v
-			}
-			val key = params["k"] ?: throw IOException("Error: Missing key from API")
-			val pc = 10
+			val key = fragment.removePrefix("yg_key=")
 			kotlinx.coroutines.runBlocking {
-				unscrambleYuriGarden(bitmap, key, pc)
+				unscrambleYuriGarden(bitmap, key, 10)
 			}
 		}
 	}
@@ -267,7 +261,7 @@ internal abstract class YuriGardenParser(
     })(${escapeForJsString(key)}, ${bitmap.height}, $partCount);
     """.trimIndent()
 
-		val result = context.evaluateJs(js) ?: throw IOException("JS evaluation failed")
+		val result = context.evaluateJs(js) ?: throw IOException("Debugging: JS evaluation failed")
 		val arr = JSONArray(result)
 
 		val out = context.createBitmap(bitmap.width, bitmap.height)
@@ -311,9 +305,5 @@ internal abstract class YuriGardenParser(
 				source = source,
 			)
 		}
-	}
-
-	private companion object {
-		const val YG_KEY = "yg_key="
 	}
 }
