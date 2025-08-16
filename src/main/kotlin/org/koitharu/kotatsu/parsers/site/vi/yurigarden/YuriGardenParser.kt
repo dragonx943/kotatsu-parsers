@@ -34,11 +34,17 @@ internal abstract class YuriGardenParser(
 
 	override val configKeyDomain = ConfigKey.Domain(domain)
 	private val apiSuffix = "api.$domain"
+	private val cdnSuffix = "db.$domain/storage/v1/object/public/yuri-garden-store"
 
 	override fun getRequestHeaders(): Headers = Headers.Builder()
 		.add("x-app-origin", "https://$domain")
 		.add("User-Agent", UserAgents.KOTATSU)
 		.build()
+
+	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
+		super.onCreateConfig(keys)
+		keys.remove(userAgentKey)
+	}
 
 	override val availableSortOrders: Set<SortOrder> = EnumSet.of(
 		SortOrder.NEWEST,
@@ -209,8 +215,7 @@ internal abstract class YuriGardenParser(
 
 			if (rawUrl.startsWith("comics")) {
 				val key = page.optString("key", null)
-
-				val url = "https://$domain/$rawUrl".toHttpUrl().newBuilder().apply {
+				val url = "https://$cdnSuffix/$rawUrl".toHttpUrl().newBuilder().apply {
 					if (!key.isNullOrEmpty()) {
 						fragment("KEY=$key")
 					}
@@ -240,14 +245,15 @@ internal abstract class YuriGardenParser(
 		if (!fragment.contains("KEY=")) return response
 
 		return context.redrawImageResponse(response) { bitmap ->
+			val url = fragment.substringBefore("KEY=")
 			val key = fragment.substringAfter("KEY=")
 			kotlinx.coroutines.runBlocking {
-				unscrambleYuriGarden(bitmap, key)
+				unscrambleImage(url, bitmap, key)
 			}
 		}
 	}
 
-	private suspend fun unscrambleYuriGarden(bitmap: Bitmap, key: String): Bitmap {
+	private suspend fun unscrambleImage(url: String, bitmap: Bitmap, key: String): Bitmap {
 		val js = """
     (function(K,H,PC){
       const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz",F=[1,1,2,6,24,120,720,5040,40320,362880,3628800];
@@ -261,22 +267,22 @@ internal abstract class YuriGardenParser(
     })("$key", ${bitmap.height}, 10);
     """.trimIndent()
 
-		val result = context.evaluateJs(js) ?: throw IOException("Debugging: JS evaluation failed")
-		throw Exception("Result = $result")
-//		val arr = JSONArray(result)
-//
-//		val out = context.createBitmap(bitmap.width, bitmap.height)
-//		var dy = 0
-//		for (i in 0 until arr.length()) {
-//			val o = arr.getJSONObject(i)
-//			val sy = o.getInt("y")
-//			val h = o.getInt("h")
-//			val src = Rect(0, sy, bitmap.width, sy + h)
-//			val dst = Rect(0, dy, bitmap.width, dy + h)
-//			out.drawBitmap(bitmap, src, dst)
-//			dy += h
-//		}
-//		return out
+		val result = context.evaluateJs(url, js)
+			?: throw IOException("Debugging: JS evaluation failed")
+		val arr = JSONArray(result)
+
+		val out = context.createBitmap(bitmap.width, bitmap.height)
+		var dy = 0
+		for (i in 0 until arr.length()) {
+			val o = arr.getJSONObject(i)
+			val sy = o.getInt("y")
+			val h = o.getInt("h")
+			val src = Rect(0, sy, bitmap.width, sy + h)
+			val dst = Rect(0, dy, bitmap.width, dy + h)
+			out.drawBitmap(bitmap, src, dst)
+			dy += h
+		}
+		return out
 	}
 
 	private suspend fun fetchTags(): Set<MangaTag> {
