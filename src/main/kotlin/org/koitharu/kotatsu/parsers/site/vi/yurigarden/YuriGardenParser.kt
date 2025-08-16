@@ -262,20 +262,21 @@ internal abstract class YuriGardenParser(
     """.trimIndent()
 
 		val result = context.evaluateJs(js) ?: throw IOException("Debugging: JS evaluation failed")
-		val arr = JSONArray(result)
-
-		val out = context.createBitmap(bitmap.width, bitmap.height)
-		var dy = 0
-		for (i in 0 until arr.length()) {
-			val o = arr.getJSONObject(i)
-			val sy = o.getInt("y")
-			val h = o.getInt("h")
-			val src = Rect(0, sy, bitmap.width, sy + h)
-			val dst = Rect(0, dy, bitmap.width, dy + h)
-			out.drawBitmap(bitmap, src, dst)
-			dy += h
-		}
-		return out
+		throw Exception("Result = $result")
+//		val arr = JSONArray(result)
+//
+//		val out = context.createBitmap(bitmap.width, bitmap.height)
+//		var dy = 0
+//		for (i in 0 until arr.length()) {
+//			val o = arr.getJSONObject(i)
+//			val sy = o.getInt("y")
+//			val h = o.getInt("h")
+//			val src = Rect(0, sy, bitmap.width, sy + h)
+//			val dst = Rect(0, dy, bitmap.width, dy + h)
+//			out.drawBitmap(bitmap, src, dst)
+//			dy += h
+//		}
+//		return out
 	}
 
 	private suspend fun fetchTags(): Set<MangaTag> {
