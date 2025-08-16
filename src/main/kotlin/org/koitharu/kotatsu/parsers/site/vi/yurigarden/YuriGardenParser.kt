@@ -212,13 +212,13 @@ internal abstract class YuriGardenParser(
 
 				val url = "https://$domain/$rawUrl".toHttpUrl().newBuilder().apply {
 					if (!key.isNullOrEmpty()) {
-						fragment("yg_key=$key")
+						fragment("KEY=$key")
 					}
-				}.build().toString()
+				}
 
 				MangaPage(
 					id = generateUid(index.toLong()),
-					url = url,
+					url = url.build().toString(),
 					preview = null,
 					source = source,
 				)
@@ -237,17 +237,17 @@ internal abstract class YuriGardenParser(
 	override fun intercept(chain: Interceptor.Chain): Response {
 		val response = chain.proceed(chain.request())
 		val fragment = response.request.url.fragment ?: return response
-		if (!fragment.startsWith("yg_key=")) return response
+		if (!fragment.contains("KEY=")) return response
 
 		return context.redrawImageResponse(response) { bitmap ->
-			val key = fragment.removePrefix("yg_key=")
+			val key = fragment.substringAfter("KEY=")
 			kotlinx.coroutines.runBlocking {
-				unscrambleYuriGarden(bitmap, key, 10)
+				unscrambleYuriGarden(bitmap, key)
 			}
 		}
 	}
 
-	private suspend fun unscrambleYuriGarden(bitmap: Bitmap, key: String, partCount: Int): Bitmap {
+	private suspend fun unscrambleYuriGarden(bitmap: Bitmap, key: String): Bitmap {
 		val js = """
     (function(K,H,PC){
       const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz",F=[1,1,2,6,24,120,720,5040,40320,362880,3628800];
@@ -258,7 +258,7 @@ internal abstract class YuriGardenParser(
       function D(e){const t=Array(e.length).fill(0);for(let n=0;n<e.length;n++)t[e[n]]=n;return t}
       function X(k,h,p){const e=U(k.slice(4),p),s=D(e),u=P(h-4*(p-1),p),m=e.map(i=>u[i]);let pts=[0];for(let i=0;i<m.length;i++)pts[i+1]=pts[i]+m[i];let f=[];for(let i=0;i<m.length;i++)f.push({y:i==0?0:pts[i]+4*i,h:m[i]});return s.map(i=>f[i])}
       return JSON.stringify(X(K,H,PC));
-    })("$key", ${bitmap.height}, $partCount);
+    })("$key", ${bitmap.height}, 10);
     """.trimIndent()
 
 		val result = context.evaluateJs(js) ?: throw IOException("Debugging: JS evaluation failed")
