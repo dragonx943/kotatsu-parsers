@@ -263,7 +263,7 @@ internal abstract class YuriGardenParser(
       function P(h,p){const n=Math.floor(h/p),r=h%p,a=[];for(let i=0;i<p;i++)a.push(n+(i<r?1:0));return a}
       function D(e){const t=Array(e.length).fill(0);for(let n=0;n<e.length;n++)t[e[n]]=n;return t}
       function X(k,h,p){const e=U(k.slice(4),p),s=D(e),u=P(h-4*(p-1),p),m=e.map(i=>u[i]);let pts=[0];for(let i=0;i<m.length;i++)pts[i+1]=pts[i]+m[i];let f=[];for(let i=0;i<m.length;i++)f.push({y:i==0?0:pts[i]+4*i,h:m[i]});return s.map(i=>f[i])}
-      return JSON.stringify(X(K,H,PC));
+      return X(K,H,PC);
     })("$key", ${bitmap.height}, 10);
     """.trimIndent()
 
