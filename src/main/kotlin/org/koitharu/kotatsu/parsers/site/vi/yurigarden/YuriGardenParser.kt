@@ -258,7 +258,7 @@ internal abstract class YuriGardenParser(
       function D(e){const t=Array(e.length).fill(0);for(let n=0;n<e.length;n++)t[e[n]]=n;return t}
       function X(k,h,p){const e=U(k.slice(4),p),s=D(e),u=P(h-4*(p-1),p),m=e.map(i=>u[i]);let pts=[0];for(let i=0;i<m.length;i++)pts[i+1]=pts[i]+m[i];let f=[];for(let i=0;i<m.length;i++)f.push({y:i==0?0:pts[i]+4*i,h:m[i]});return s.map(i=>f[i])}
       return JSON.stringify(X(K,H,PC));
-    })(${escapeForJsString(key)}, ${bitmap.height}, $partCount);
+    })("$key", ${bitmap.height}, $partCount);
     """.trimIndent()
 
 		val result = context.evaluateJs(js) ?: throw IOException("Debugging: JS evaluation failed")
@@ -277,22 +277,6 @@ internal abstract class YuriGardenParser(
 		}
 		return out
 	}
-
-	private fun escapeForJsString(s: String): String =
-		buildString {
-			append('"')
-			for (c in s) {
-				when (c) {
-					'\\' -> append("\\\\")
-					'"' -> append("\\\"")
-					'\n' -> append("\\n")
-					'\r' -> append("\\r")
-					'\t' -> append("\\t")
-					else -> append(c)
-				}
-			}
-			append('"')
-		}
 
 	private suspend fun fetchTags(): Set<MangaTag> {
 		val json = webClient.httpGet("https://$apiSuffix/resources/systems_vi.json").parseJson()
