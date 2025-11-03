@@ -14,12 +14,12 @@ import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
 import java.text.SimpleDateFormat
 import java.util.*
 
-@Broken
+@Broken("Debugging")
 @MangaSourceParser("NHENTAIWORLD", "Nhentai World", "vi", ContentType.HENTAI)
 internal class NhentaiWorld(context: MangaLoaderContext) :
 	PagedMangaParser(context, MangaParserSource.NHENTAIWORLD, 24) {
 
-	override val configKeyDomain = ConfigKey.Domain("nhentaiworld-h1.art")
+	override val configKeyDomain = ConfigKey.Domain("nhentaiclub.icu")
 
 	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)
@@ -77,10 +77,12 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 			)
 		}
 
-		urlBuilder.addQueryParameter("page", page.toString())
+        if (page > 1) {
+            urlBuilder.addQueryParameter("page", page.toString())
+        }
 
 		val doc = webClient.httpGet(urlBuilder.build()).parseHtml()
-		return doc.select("div.relative.mb-1.h-full.max-h-\\[375px\\]").map { div ->
+		return doc.select("div.relative.mb-1.h-full.max-h-\\[405px\\]").map { div ->
 			val img = div.selectFirst("img.hover\\:scale-105.transition-all.w-full.h-full")
 			val a = div.selectFirstOrThrow("a")
 
@@ -107,7 +109,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 
 	override suspend fun getDetails(manga: Manga): Manga {
 		val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
-		val root = doc.selectFirst("div.flex-1.bg-neutral-900") ?: return manga
+		val root = doc.selectFirst("div.flex-1.bg-neutral-950") ?: return manga
 		val chapterDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply {
 			timeZone = TimeZone.getTimeZone("GMT+7")
 		}
@@ -116,7 +118,11 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 			val tagName = button.text().toTitleCase(sourceLocale)
 			val tagUrl = button.parent()?.attrOrNull("href")?.substringAfterLast('/')
 			if (tagUrl != null) {
-				MangaTag(title = tagName, key = tagUrl, source = source)
+				MangaTag(
+                    title = tagName,
+                    key = tagUrl,
+                    source = source
+                )
 			} else {
 				null
 			}
