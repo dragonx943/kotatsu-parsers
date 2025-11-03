@@ -107,11 +107,9 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 
 	override suspend fun getDetails(manga: Manga): Manga {
 		val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
-		val root = doc.selectFirst("div.flex-1.bg-neutral-950") ?: return manga
-		val chapterDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply {
-			timeZone = TimeZone.getTimeZone("GMT+7")
-		}
 
+        // prevent e
+		val root = doc.selectFirst("div.flex-1.bg") ?: return manga
 		val tags = root.select("div.flex.flex-wrap.gap-2 button").mapNotNullToSet { button ->
 			val tagName = button.text().toTitleCase(sourceLocale)
 			val tagUrl = button.parent()?.attrOrNull("href")?.substringAfterLast('/')
@@ -134,6 +132,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 
 		val description = root.selectFirst("div#introduction-wrap p.font-light")?.html()?.nullIfEmpty()
 
+        // not available, can remove later
 		val altTitles = description?.split("\n")?.mapNotNullToSet { line ->
 			when {
 				line.startsWith("Tên tiếng anh:", ignoreCase = true) ->
@@ -150,10 +149,9 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 			val data = script.data()
 			data.contains("data") && data.contains("chapterListEn")
 		}?.data()
-		val chapters = parseChapterList(scriptTag, manga, chapterDateFormat)
+		val chapters = parseChapterList(scriptTag, manga)
 
 		return manga.copy(
-			title = doc.selectFirst("h1")!!.text(),
 			tags = tags,
 			state = state,
 			description = description,
@@ -162,8 +160,11 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 		)
 	}
 
-	private fun parseChapterList(scriptTag: String?, manga: Manga, chapterDateFormat: SimpleDateFormat): List<MangaChapter> {
+	private fun parseChapterList(scriptTag: String?, manga: Manga): List<MangaChapter> {
 		val idManga = manga.url.substringAfter("detail/").toIntOrNull() ?: return emptyList()
+        val chapterDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply {
+            timeZone = TimeZone.getTimeZone("GMT+7")
+        }
 
 		val chapters = ArrayList<MangaChapter>()
 		if (scriptTag.isNullOrEmpty()) return chapters
