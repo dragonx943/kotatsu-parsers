@@ -9,6 +9,7 @@ import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
+import org.koitharu.kotatsu.parsers.util.json.mapJSON
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -269,31 +270,28 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 	}
 
     private suspend fun fetchTags(): Set<MangaTag> {
-        val doc = webClient.httpGet("https://$domain/_next/static/chunks/130-5da82838372f6835.js").parseRaw()
-
-        val start = doc.indexOf("genres:[{")
+        val js = webClient.httpGet("https://$domain/_next/static/chunks/130-5da82838372f6835.js")
+            .parseRaw()
+        val start = js.indexOf("genres:[{")
         if (start == -1) return emptySet()
-        val end = doc.indexOf("}]", start)
+        val end = js.indexOf("}]", start)
         if (end == -1) return emptySet()
-        val fullJs = doc.substring(start + 8, end + 2)
 
-        // clean js
-        val jsClean = fullJs
+        var fullJs = js.substring(start + 7, end + 2)
             .replace(Regex(",?description:\\s*\"[^\"]*\""), "")
             .replace(Regex("(\\w+):"), "\"$1\":")
+            .replace("\\/", "/")
+            .trim()
 
-        // mapping
-        val genres = JSONArray(jsClean)
-        return buildSet {
-            for (i in 0 until genres.length()) {
-                val item = genres.getJSONObject(i)
-                val label = item.optString("label")?.trim()?.ifEmpty { null } ?: continue
-                val href = item.optString("href")?.trim()?.ifEmpty { null } ?: continue
-                val key = href.substringAfterLast("/")
-                if (label != "Tất cả" && key != "all") { // no more all tag
-                    add(MangaTag(title = label.toTitleCase(sourceLocale), key = key, source = source))
-                }
-            }
-        }
+        if (!fullJs.startsWith("[")) fullJs = "[$fullJs]"
+        if (!fullJs.endsWith("]")) fullJs += "]"
+
+        return JSONArray(fullJs).mapJSON { item ->
+            MangaTag(
+                title = item.optString("label"),
+                key = item.optString("href").substringAfterLast("/"),
+                source = source,
+            )
+        }.toSet()
     }
 }
