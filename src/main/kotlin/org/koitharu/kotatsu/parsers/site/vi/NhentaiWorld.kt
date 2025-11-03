@@ -2,7 +2,6 @@ package org.koitharu.kotatsu.parsers.site.vi
 
 import okhttp3.Headers
 import org.json.JSONArray
-import org.koitharu.kotatsu.parsers.Broken
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
@@ -10,11 +9,9 @@ import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
-import org.koitharu.kotatsu.parsers.util.json.getStringOrNull
 import java.text.SimpleDateFormat
 import java.util.*
 
-@Broken("Debugging")
 @MangaSourceParser("NHENTAIWORLD", "Nhentai World", "vi", ContentType.HENTAI)
 internal class NhentaiWorld(context: MangaLoaderContext) :
 	PagedMangaParser(context, MangaParserSource.NHENTAIWORLD, 24) {
@@ -187,7 +184,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 
 		val vnArray = try {
 			JSONArray(vnChapterStr)
-		} catch (e: Exception) {
+		} catch (_: Exception) {
 			JSONArray()
 		}
 
@@ -223,7 +220,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 
 		val enArray = try {
 			JSONArray(enChapterStr)
-		} catch (e: Exception) {
+		} catch (_: Exception) {
 			JSONArray()
 		}
 
@@ -271,37 +268,32 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 		}
 	}
 
-	private suspend fun fetchTags(): Set<MangaTag> {
-		val doc = webClient.httpGet("https://$domain").parseHtml()
-		val scriptSrc = doc.select("script")[7].src()!!
-		val docJS = webClient.httpGet(scriptSrc).parseRaw()
+    private suspend fun fetchTags(): Set<MangaTag> {
+        val doc = webClient.httpGet("https://$domain/_next/static/chunks/130-5da82838372f6835.js").parseRaw()
 
-		val optionsStart = docJS.indexOf("genres:[{")
-		if (optionsStart == -1) return emptySet()
+        val start = doc.indexOf("genres:[{")
+        if (start == -1) return emptySet()
+        val end = doc.indexOf("}]", start)
+        if (end == -1) return emptySet()
+        val fullJs = doc.substring(start + 8, end + 2)
 
-		val optionsEnd = docJS.indexOf("}]", optionsStart)
-		if (optionsEnd == -1) return emptySet()
+        // clean js
+        val jsClean = fullJs
+            .replace(Regex(",?description:\\s*\"[^\"]*\""), "")
+            .replace(Regex("(\\w+):"), "\"$1\":")
 
-		val optionsStr = docJS.substring(optionsStart + 7, optionsEnd + 2)
-
-		val optionsArray = JSONArray(
-			optionsStr
-				.replace(Regex(",description:\\s*\"[^\"]*\"(,?)"), "")
-				.replace(Regex("(\\w+):"), "\"$1\":")
-		)
-
-		return buildSet {
-			for (i in 0 until optionsArray.length()) {
-				// {"label":"Ahegao","href":"/genre/ahegao"}
-				val option = optionsArray.getJSONObject(i)
-				val title = option.getStringOrNull("label")!!.toTitleCase(sourceLocale)
-				val key = option.getStringOrNull("href")!!.split("/")[2]
-				if (title.isNotEmpty() && key.isNotEmpty()) {
-					if (title != "Tất cả" || key != "all") { // remove "All" tags, default list = all
-						add(MangaTag(title = title, key = key, source = source))
-					}
-				}
-			}
-		}
-	}
+        // mapping
+        val genres = JSONArray(jsClean)
+        return buildSet {
+            for (i in 0 until genres.length()) {
+                val item = genres.getJSONObject(i)
+                val label = item.optString("label")?.trim()?.ifEmpty { null } ?: continue
+                val href = item.optString("href")?.trim()?.ifEmpty { null } ?: continue
+                val key = href.substringAfterLast("/")
+                if (label != "Tất cả" && key != "all") { // no more all tag
+                    add(MangaTag(title = label.toTitleCase(sourceLocale), key = key, source = source))
+                }
+            }
+        }
+    }
 }
